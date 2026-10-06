@@ -315,12 +315,15 @@
       "anchorLabel": "WIEDERANPFIFF",
       "start": {
         "label": "PAUSE STARTEN",
-        "sub": "Ton aus · Highlight-Clip · Pausenvideo im Loop",
+        "sub": "Ton aus · Einblender aus · Highlight-Clip · Pausenvideo im Loop",
         "note": "Zurück mit dem Knopf ZURÜCK ZUM SPIEL",
         "minutes": 10,
         "calls": [
           {
             "panel": "audioPause"
+          },
+          {
+            "panel": "overlaysOff"
           },
           {
             "panel": "highlightClip"
@@ -370,6 +373,9 @@
             "Input": "Haupt"
           },
           {
+            "panel": "overlaysOn"
+          },
+          {
             "panel": "audioGame"
           },
           {
@@ -393,7 +399,7 @@
         {
           "at": "-10:00",
           "label": "Pausenbeginn",
-          "sub": "Mikrofone stumm, Liga- und Riders-Intro, Highlight-Clip, Outro"
+          "sub": "Mikrofone stumm, alle Einblender aus, Liga- und Riders-Intro, Highlight-Clip, Outro"
         },
         {
           "at": "-08:00",
@@ -403,7 +409,7 @@
         {
           "at": "00:00",
           "label": "Zurück zum Spiel",
-          "sub": "Knopf: Lidl-Clip, dann Kamera M mit Ton",
+          "sub": "Knopf: Lidl-Clip, dann Kamera M mit Ton, Einblender wieder an",
           "tag": "Knopf"
         }
       ]

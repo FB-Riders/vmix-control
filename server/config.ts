@@ -5,7 +5,7 @@ import { z } from 'zod';
 const vmixCall = z.union([
   z.object({ wait: z.number().positive() }),
   // Things the panel does itself rather than a single vMix function.
-  z.object({ panel: z.enum(['audioGame', 'audioPause', 'playHighlights', 'highlightClip', 'breakSound', 'waitPlayback', 'startAll', 'stopAll', 'logosOn', 'logosOff']) }),
+  z.object({ panel: z.enum(['audioGame', 'audioPause', 'playHighlights', 'highlightClip', 'breakSound', 'overlaysOff', 'overlaysOn', 'waitPlayback', 'startAll', 'stopAll', 'logosOn', 'logosOff']) }),
   z.object({
     Function: z.string(),
     Input: z.union([z.string(), z.number()]).optional(),

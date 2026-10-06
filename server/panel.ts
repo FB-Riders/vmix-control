@@ -82,7 +82,7 @@ export class Panel {
   private clockHidden = false; // scoreboard overlay taken off for a replay, to be restored
   private hiddenOverlays: { channel: number; input: string }[] = []; // taken off for the highlights, to be restored
   private musicOn = false; // highlight music started by the panel, to be stopped when the reel is over
-  private holdOverlays = false; // highlight video: overlays stay off for the whole recording, not only the scenes
+  private holdOverlays = false; // overlays stay off beyond the highlight scenes: whole highlight video, whole break
   private onHighlightList = false; // vMix currently shows the highlight event list instead of the main one
   private sponsor = { enabled: false, nextAt: 0, activeUntil: 0, rotation: 0 };
   private schedule: ScheduleStore;
@@ -170,8 +170,8 @@ export class Panel {
           this.exclusive(() => this.afterPlayback()).catch(() => {});
         }
       }
-      const highlightsOnAir = this.playing?.id === null; // no sponsor overlay over the highlights
-      if (this.sponsor.enabled && now >= this.sponsor.nextAt && !highlightsOnAir) this.showSponsor().catch(() => {});
+      const clean = this.playing?.id === null || this.holdOverlays; // no sponsor overlay over the highlights or the break
+      if (this.sponsor.enabled && now >= this.sponsor.nextAt && !clean) this.showSponsor().catch(() => {});
       this.monitor.update(this.vm, this.monitorContext(now));
       this.runDueSteps(now);
     }
@@ -445,11 +445,12 @@ export class Panel {
       logos: logos.length ? { visible: logos.every((l) => l.visible) } : null,
       health: {
         watches: this.monitor.watches(logos.length > 0),
-        // The logos being off during the highlights is intended, so it raises no alarm (it still counts in the controlling).
+        // The logos being off during the highlights or a break that switches them off is intended, so it raises no alarm
+        // (it still counts in the controlling).
         alerts: [
           ...(this.notice ? [this.notice.text] : []),
           ...(vm?.streaming && !this.replayRecording() ? ['Replay-Aufnahme läuft nicht: keine Replays möglich'] : []),
-          ...(vm ? this.monitor.alerts(this.hiddenOverlays.length ? { ...ctx, logosVisible: null } : ctx) : []),
+          ...(vm ? this.monitor.alerts(this.hiddenOverlays.length || this.holdOverlays ? { ...ctx, logosVisible: null } : ctx) : []),
         ],
         loudness: vm?.streaming || sources.some((s) => s.on) ? this.monitor.loudness() : null,
         loudnessTarget: cfg.audio?.loudnessTarget ?? -16,
@@ -534,6 +535,8 @@ export class Panel {
     if (c.panel === 'playHighlights') await this.playHighlights();
     else if (c.panel === 'audioGame' || c.panel === 'audioPause') await this.setAudio(c.panel === 'audioGame');
     else if (c.panel === 'breakSound') await this.applyBreakSound();
+    else if (c.panel === 'overlaysOff') { this.holdOverlays = true; await this.hideOverlays(); }
+    else if (c.panel === 'overlaysOn') { this.holdOverlays = false; await this.restoreOverlays(); }
     else if (c.panel === 'logosOn' || c.panel === 'logosOff') await this.setLogos(c.panel === 'logosOn');
     else if (c.panel === 'startAll') await this.setOutputs(true);
     else if (c.panel === 'stopAll') await this.setOutputs(false);

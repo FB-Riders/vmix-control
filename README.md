@@ -86,7 +86,7 @@ ends up in vMix's recording folder. Clip lengths come from vMix, the scene lengt
 
 Calls in `action.calls`, `start.calls` and `finish.calls` are vMix API calls such as
 `{ "Function": "CutDirect", "Input": "Resultat" }`, pauses `{ "wait": 500 }`, or panel steps `{ "panel": "…" }`:
-`audioPause`, `audioGame`, `logosOn`, `logosOff`, `highlightClip` (intro clips, highlight reel, outro clips from `replay.highlightClip`; without highlights only the intro clips run), `playHighlights`, `waitPlayback` (until the replay is over), `startAll`, `stopAll`
+`audioPause`, `audioGame`, `logosOn`, `logosOff`, `overlaysOff` (all overlay channels off and kept off) / `overlaysOn` (put the same ones back), `highlightClip` (intro clips, highlight reel, outro clips from `replay.highlightClip`; without highlights only the intro clips run), `playHighlights`, `waitPlayback` (until the replay is over), `startAll`, `stopAll`
 (stream, recording and replay recording). If one call fails the rest still runs and the failure shows as an alert.
 
 Restart `start.bat` after changing `config.json`. "Neues Spiel" on the pre-game screen clears checklist, controlling
