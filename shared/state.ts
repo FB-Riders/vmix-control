@@ -19,10 +19,10 @@ export interface Score {
 export interface ReplayEntry {
   id: number;
   time: string;
-  period: string; // period at the time of marking
+  period: number; // index into ReplayState.periods
   type: string;
   cams: string[];
-  highlight: boolean; // goes into the highlight list
+  highlight: boolean; // has a copy in vMix's highlight tab
   locked: boolean; // always a highlight (e.g. goals), the star cannot be removed
   playing: boolean;
 }
@@ -33,8 +33,14 @@ export interface ReplayState {
   defaultType: string;
   cams: string[];
   marks: { id: string; label: string; sub: string; cams: string[] }[];
-  list: ReplayEntry[];
+  list: ReplayEntry[]; // all scenes, newest first
   highlightCount: number;
+  periods: { label: string; short: string; tab: number; count: number }[]; // one vMix event tab per period
+  period: number; // period new scenes are filed under
+  periodAuto: boolean; // it follows the scoreboard
+  periodFromScoreboard: number | null; // what the scoreboard says, if readable
+  breakPeriod: number; // period whose scenes the break clip shows
+  highlightTab: number;
 }
 
 export interface AudioState {

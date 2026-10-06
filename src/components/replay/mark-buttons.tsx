@@ -66,3 +66,38 @@ export function MarkButtons({ replay, marking, recording, desktop }: Props) {
     </div>
   );
 }
+
+/** Which period new replays are filed under: follow the scoreboard, or set it by hand. */
+export function PeriodSelect({ replay }: { replay: ReplayState }) {
+  const option = 'h-8 border px-0 text-xs font-black';
+  const on = 'border-muted-foreground bg-muted-foreground text-background hover:bg-muted-foreground hover:text-background';
+  const off = 'border-secondary bg-secondary';
+  return (
+    <div className="flex items-center gap-2">
+      <span className="shrink-0 text-xs font-light text-muted-foreground">Abschnitt</span>
+      <div className="grid grow auto-cols-fr grid-flow-col gap-1.5">
+        <Button
+          variant="outline"
+          className={cn(option, replay.periodAuto ? on : off)}
+          aria-pressed={replay.periodAuto}
+          aria-label="Abschnitt von der Matchuhr übernehmen"
+          onClick={() => act('replay/period', { period: null })}
+        >
+          AUTO
+        </Button>
+        {replay.periods.map((p, i) => (
+          <Button
+            key={p.tab}
+            variant="outline"
+            className={cn(option, i === replay.period ? (replay.periodAuto ? 'border-muted-foreground bg-secondary' : on) : off)}
+            aria-pressed={i === replay.period}
+            aria-label={`Replays unter ${p.label} ablegen`}
+            onClick={() => act('replay/period', { period: i })}
+          >
+            {p.short}
+          </Button>
+        ))}
+      </div>
+    </div>
+  );
+}

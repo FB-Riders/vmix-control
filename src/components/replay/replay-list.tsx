@@ -3,22 +3,24 @@ import { useEffect, useState } from 'react';
 import type { ReplayState } from '@shared/state';
 import { Button } from '@/components/ui/button';
 import { act } from '@/lib/api';
-import { periodShort } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 interface Props {
   replay: ReplayState;
   visible: number; // rows shown before the list scrolls
-  currentPeriod: string;
   desktop?: boolean;
 }
 
 /** Recent replays: star for the highlight video, camera angles, preview in vMix, play to output, delete (second tap confirms). */
-export function ReplayList({ replay, visible, currentPeriod, desktop }: Props) {
+export function ReplayList({ replay, visible, desktop }: Props) {
   const control = desktop ? 'h-11' : 'h-[38px]';
   const rowHeight = desktop ? 56 : 48;
   const gap = desktop ? 12 : 4;
   const [deleting, setDeleting] = useState<number | null>(null); // replay whose delete button is armed
+  // Which vMix event tab is shown: a period, the highlights, or (null) whatever period is current.
+  const [chosen, setChosen] = useState<number | 'highlights' | null>(null);
+  const view = chosen ?? replay.period;
+  const scenes = replay.list.filter((r) => (view === 'highlights' ? r.highlight : r.period === view));
 
   useEffect(() => {
     if (deleting === null) return;
@@ -32,17 +34,39 @@ export function ReplayList({ replay, visible, currentPeriod, desktop }: Props) {
     void act('replay/delete', { id });
   }
 
-  if (replay.list.length === 0) {
-    return <span className="py-1.5 text-xs font-light text-muted-foreground">Noch keine Replays markiert.</span>;
-  }
+  const tab = (key: number | 'highlights', label: string, count: number, title: string) => (
+    <Button
+      key={key}
+      variant="outline"
+      className={cn(
+        'border px-0 font-black tabular-nums', desktop ? 'h-8 text-xs' : 'h-8 text-[11px]',
+        key === view ? 'border-muted-foreground bg-muted-foreground text-background hover:bg-muted-foreground hover:text-background' : 'border-secondary bg-secondary',
+      )}
+      aria-pressed={key === view}
+      aria-label={`${title}, ${count} Szenen`}
+      onClick={() => setChosen(key === replay.period ? null : key)}
+    >
+      {label}<span className="ml-1 font-light">{count}</span>
+    </Button>
+  );
 
   return (
-    <div
-      className={cn('flex flex-col overflow-y-auto overscroll-contain', desktop ? 'gap-3' : 'gap-1')}
-      style={{ maxHeight: visible * rowHeight + (visible - 1) * gap + rowHeight / 2 }} // half a row peeks out to show there is more
-    >
-      {replay.list.map((r) => {
-        const time = desktop && r.period && r.period !== currentPeriod ? `${periodShort(r.period)} ${r.time}` : r.time;
+    <>
+      <div className="grid auto-cols-fr grid-flow-col gap-1.5">
+        {replay.periods.map((p, i) => tab(i, p.short, p.count, p.label))}
+        {tab('highlights', '★', replay.highlightCount, 'Highlights')}
+      </div>
+      {scenes.length === 0 && (
+        <span className="py-1.5 text-xs font-light text-muted-foreground">
+          {view === 'highlights' ? 'Noch keine Highlights.' : `Noch keine Replays im Abschnitt ${replay.periods[view]?.label ?? ''}.`}
+        </span>
+      )}
+      <div
+        className={cn('flex flex-col overflow-y-auto overscroll-contain', desktop ? 'gap-3' : 'gap-1')}
+        style={{ maxHeight: visible * rowHeight + (visible - 1) * gap + rowHeight / 2 }} // half a row peeks out to show there is more
+      >
+      {scenes.map((r) => {
+        const time = r.time;
         return (
           <div
             key={r.id}
@@ -112,6 +136,7 @@ export function ReplayList({ replay, visible, currentPeriod, desktop }: Props) {
           </div>
         );
       })}
-    </div>
+      </div>
+    </>
   );
 }

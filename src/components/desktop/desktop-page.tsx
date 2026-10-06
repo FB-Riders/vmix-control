@@ -2,7 +2,7 @@ import type { PanelState } from '@shared/state';
 import { AudioPresetButton, AudioSources, MusicRow } from '@/components/audio';
 import { Caption } from '@/components/caption';
 import { ProgramRow, PreviewRow } from '@/components/live/camera-bus';
-import { MarkButtons } from '@/components/replay/mark-buttons';
+import { MarkButtons, PeriodSelect } from '@/components/replay/mark-buttons';
 import { ReplayList } from '@/components/replay/replay-list';
 import { SponsorRow } from '@/components/sponsor';
 import { Button } from '@/components/ui/button';
@@ -165,11 +165,12 @@ export function DesktopPage({ state, marking }: { state: PanelState; marking: Ma
           title={pending ? `MARKIERT ${camsLabel(pending.cams)} · WAS WAR ES?` : 'REPLAY MARKIEREN'}
           hint={pending ? `sonst nach 5 s: ${replay.defaultType}` : `${replay.seconds} s zurück`}
         />
+        <PeriodSelect replay={replay} />
         <MarkButtons replay={replay} marking={marking} recording={state.replayRecording} desktop />
-        <Label title="LETZTE REPLAYS" hint={`★ = Highlight-Video · ${replay.highlightCount} Szenen`} className="mt-3" />
-        <ReplayList replay={replay} visible={6} currentPeriod={score?.period ?? ''} desktop />
+        <Label title="REPLAYS" hint={`vMix-Tabs ${replay.periods.map((p) => p.tab).join(', ')} · ★ = Tab ${replay.highlightTab}`} className="mt-3" />
+        <ReplayList replay={replay} visible={5} desktop />
         <span className="text-xs leading-relaxed font-light text-muted-foreground">
-          Tore landen automatisch im Highlight-Video, alles andere mit ★. Abspielen immer mit Stinger, Matchuhr ausgeblendet.
+          Jedes Replay liegt im Tab seines Abschnitts. Tore und ★ werden zusätzlich in den Highlight-Tab kopiert, aus dem am Schluss das Highlight-Video entsteht.
         </span>
       </div>
     </DesktopShell>

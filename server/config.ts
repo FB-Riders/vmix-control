@@ -5,7 +5,7 @@ import { z } from 'zod';
 const vmixCall = z.union([
   z.object({ wait: z.number().positive() }),
   // Things the panel does itself rather than a single vMix function.
-  z.object({ panel: z.enum(['audioGame', 'audioPause', 'playHighlights', 'highlightClip', 'breakSound', 'overlaysOff', 'overlaysOn', 'waitPlayback', 'startAll', 'stopAll', 'logosOn', 'logosOff']) }),
+  z.object({ panel: z.enum(['audioGame', 'audioPause', 'playHighlights', 'highlightClip', 'periodClip', 'breakSound', 'overlaysOff', 'overlaysOn', 'waitPlayback', 'startAll', 'stopAll', 'logosOn', 'logosOff']) }),
   z.object({
     Function: z.string(),
     Input: z.union([z.string(), z.number()]).optional(),
@@ -56,8 +56,9 @@ const configSchema = z.object({
   replay: z.object({
     seconds: z.number().positive(),
     channel: z.string().default(''),
-    mainList: z.number().int().min(1).max(20).default(1),
-    highlightList: z.number().int().min(1).max(20).default(2),
+    // vMix Replay event tabs: one per period for the marked scenes, one for the highlights (copies of starred scenes).
+    periods: z.array(z.object({ label: z.string(), short: z.string(), tab: z.number().int().min(1).max(20) })).min(1),
+    highlightTab: z.number().int().min(1).max(20).default(10),
     autoHighlightTypes: z.array(z.string()).default([]),
     hideScoreboard: z.boolean().default(false),
     highlightMusic: z.string().default(''), // audio input played under the highlight reel

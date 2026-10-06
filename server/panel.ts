@@ -4,19 +4,10 @@ import type { ActionInput, ActionName, ActionResult } from '../shared/actions';
 import type { ControllingItem, PanelState, ScheduleState, Score, SimState, Tick, VideoState } from '../shared/state';
 import type { Config, VmixCall } from './config';
 import { emptyLog, type MatchLog, Monitor, type MonitorContext } from './monitor';
+import { ReplayBook, type ReplayBookData, type Scene } from './replays';
 import { type VmixClient, VmixError, type VmixInput, type VmixState } from './vmix';
 
 export class PanelError extends Error {}
-
-interface StoredReplay {
-  id: number;
-  time: string;
-  period: string;
-  cams: string[];
-  type: string;
-  fav: boolean;
-  copied: boolean; // already in vMix's highlight event list
-}
 
 interface ScheduleStore {
   id: string;
@@ -27,8 +18,8 @@ interface ScheduleStore {
 
 interface Persisted {
   day?: string;
-  replays?: StoredReplay[];
-  nextId?: number;
+  book?: ReplayBookData;
+  periodManual?: number | null;
   schedule?: ScheduleStore;
   ticks?: Record<string, boolean>;
   log?: MatchLog;
@@ -41,6 +32,8 @@ type Snapshot = Omit<PanelState, 'now'>;
 
 const AUTO_WINDOW_MS = 4000; // an automatic step that is later than this is skipped, not caught up
 // Test run: holds configured in a step are cut to this (long enough for the 10 s sponsor clip) ...
+// A reel is over when the replay has been off program this long (longer than a transition between two events).
+const REEL_GAP_MS = 2500;
 const SIM_MAX_HOLD_MS = 10_500;
 // ... clips up to this length play in full, longer ones only this long.
 const SIM_FULL_CLIP_SEC = 45;
@@ -76,14 +69,16 @@ function meterLevel(amplitude: number): number {
 /** Holds everything the clients share and turns their actions into vMix API calls. */
 export class Panel {
   private vm: VmixState | null = null; // null while vMix is unreachable
-  private replays: StoredReplay[] = []; // newest first
-  private nextId = 1;
-  private playing: { id: number | null; since: number; seen: boolean } | null = null; // id null = highlight reel
+  private readonly book: ReplayBook; // the scenes and which vMix event tab holds them
+  private periodManual: number | null = null; // period chosen by the operator; null = follow the scoreboard
+  private breakPeriod: number | null = null; // period the break clip shows; null = the current one
+  // Replay playback in progress. id null = a whole tab. minUntil: it cannot be over before that; offSince: since
+  // when the replay has not been on program.
+  private playing: { id: number | null; since: number; seen: boolean; minUntil: number; offSince: number } | null = null;
   private clockHidden = false; // scoreboard overlay taken off for a replay, to be restored
   private hiddenOverlays: { channel: number; input: string }[] = []; // taken off for the highlights, to be restored
-  private musicOn = false; // highlight music started by the panel, to be stopped when the reel is over
+  private reelMusic: string | number | null = null; // music input started for a reel, to be paused when it is over
   private holdOverlays = false; // overlays stay off beyond the highlight scenes: whole highlight video, whole break
-  private onHighlightList = false; // vMix currently shows the highlight event list instead of the main one
   private sponsor = { enabled: false, nextAt: 0, activeUntil: 0, rotation: 0 };
   private schedule: ScheduleStore;
   private autoRun = true;
@@ -107,15 +102,14 @@ export class Panel {
     let saved: Persisted = {};
     try { saved = JSON.parse(fs.readFileSync(this.dataFile, 'utf8')) as Persisted; } catch { /* first start */ }
     const sameDay = saved.day === today();
-    if (saved.replays?.every((r) => Array.isArray(r.cams))) {
-      this.replays = saved.replays;
-      this.nextId = saved.nextId ?? 1;
-    }
+    const { replay } = cfg;
+    this.book = new ReplayBook((params) => vmix.call(params), replay.periods.map((p) => p.tab), replay.highlightTab, saved.book);
+    this.periodManual = saved.periodManual ?? null;
     const s = sameDay ? saved.schedule : undefined;
     this.schedule = s?.anchors && cfg.schedules.some((x) => x.id === s.id) ? s : { id: cfg.schedules[0].id, anchors: {}, rounds: {} };
     if (sameDay) this.ticks = saved.ticks ?? {};
     this.recordGame = saved.recordGame ?? cfg.preGame.recordGame;
-    this.breakMusic = saved.breakMusic ?? false;
+    this.breakMusic = saved.breakMusic ?? true;
     this.monitor = new Monitor(cfg, saved.log);
     this.video.speed = cfg.postGame.highlightVideo?.speeds.at(-1) ?? 100;
   }
@@ -163,9 +157,13 @@ export class Panel {
 
     if (this.vm) {
       if (this.playing) {
+        const p = this.playing;
         const onAir = this.activeInput()?.type === 'Replay';
-        if (onAir) this.playing.seen = true;
-        else if (this.playing.seen || now - this.playing.since > 8000) {
+        if (onAir) { p.seen = true; p.offSince = 0; } else p.offSince ||= now;
+        // Between the events of a reel vMix can leave the replay for a moment (transition). So playback only counts
+        // as over once the scenes had time to run and the replay has stayed off program for a while.
+        const offLongEnough = !onAir && now - p.offSince >= (p.id === null ? REEL_GAP_MS : 1000);
+        if (offLongEnough && now >= p.minUntil && (p.seen || now - p.since > 8000)) {
           this.playing = null;
           this.exclusive(() => this.afterPlayback()).catch(() => {});
         }
@@ -243,11 +241,26 @@ export class Panel {
     return { home: f(sb.home), away: f(sb.away), period: period && sb.periodFormat.replace('{}', period), clock, teams: names.every(Boolean) ? names.join(' – ') : '' };
   }
 
-  private isHighlight(r: StoredReplay): boolean {
-    return r.fav || this.cfg.replay.autoHighlightTypes.includes(r.type);
+  /** Period shown on the scoreboard as an index into the configured periods; anything that is not 1, 2, 3 ... counts as the last (overtime). */
+  private scoreboardPeriod(): number | null {
+    const sb = this.cfg.scoreboard;
+    const raw = sb?.period ? this.findInput(sb.input)?.fields[sb.period]?.trim() : '';
+    if (!raw) return null;
+    const last = this.cfg.replay.periods.length - 1;
+    return /^\d+$/.test(raw) ? Math.min(Math.max(Number(raw) - 1, 0), last) : last;
   }
 
-  private highlights(): StoredReplay[] { return this.replays.filter((r) => this.isHighlight(r)); }
+  /** Period new scenes are filed under. */
+  private period(): number {
+    return Math.min(this.periodManual ?? this.scoreboardPeriod() ?? 0, this.cfg.replay.periods.length - 1);
+  }
+
+  private periodTab(period: number): number { return this.book.tabOf(period); }
+
+  /** Starred scenes and types that always count (goals) belong in the highlight tab; this makes vMix match. */
+  private async syncHighlight(scene: Scene): Promise<void> {
+    await this.book.setHighlight(scene, scene.fav || this.cfg.replay.autoHighlightTypes.includes(scene.type));
+  }
 
   private audioSources() {
     return (this.cfg.audio?.sources ?? []).map(({ id, name, short, input }) => {
@@ -359,7 +372,7 @@ export class Panel {
   private videoState(): VideoState | null {
     const hv = this.cfg.postGame.highlightVideo;
     if (!hv) return null;
-    const scenes = this.highlights();
+    const scenes = this.book.highlights();
     const goals = scenes.filter((r) => this.cfg.replay.autoHighlightTypes.includes(r.type)).length;
     const sceneSec = Math.round(scenes.reduce((sum, r) => sum + this.cfg.replay.seconds * r.cams.length, 0) / (this.video.speed / 100));
     const timeline = hv.template.map((t) => ('input' in t
@@ -426,13 +439,19 @@ export class Panel {
         defaultType: cfg.replay.defaultType,
         cams: cfg.cams.map((c) => c.id),
         marks: cfg.replay.marks.map(({ id, label, sub, cams }) => ({ id, label, sub, cams })),
-        list: this.replays.map((r) => ({
+        list: this.book.all().map((r) => ({
           id: r.id, time: r.time, period: r.period, type: r.type, cams: r.cams,
-          highlight: this.isHighlight(r),
+          highlight: this.book.isHighlight(r.id),
           locked: cfg.replay.autoHighlightTypes.includes(r.type),
           playing: this.playing?.id === r.id,
         })),
-        highlightCount: this.highlights().length,
+        highlightCount: this.book.highlights().length,
+        periods: cfg.replay.periods.map((p) => ({ ...p, count: this.book.count(p.tab) })),
+        period: this.period(),
+        periodAuto: this.periodManual === null,
+        periodFromScoreboard: this.scoreboardPeriod(),
+        breakPeriod: Math.min(this.breakPeriod ?? this.period(), cfg.replay.periods.length - 1),
+        highlightTab: cfg.replay.highlightTab,
       },
       audio: sources.length
         ? { sources, preset: sources.every((s) => s.on) ? 'game' : sources.every((s) => !s.on) ? 'pause' : null }
@@ -493,7 +512,7 @@ export class Panel {
   }
 
   private persist(): void {
-    const data: Persisted = { day: today(), replays: this.replays, nextId: this.nextId, schedule: this.schedule, ticks: this.ticks, log: this.monitor.log, recordGame: this.recordGame, breakMusic: this.breakMusic };
+    const data: Persisted = { day: today(), book: this.book.toJSON(), periodManual: this.periodManual, schedule: this.schedule, ticks: this.ticks, log: this.monitor.log, recordGame: this.recordGame, breakMusic: this.breakMusic };
     this.monitor.dirty = false;
     this.lastSaved = Date.now();
     fs.mkdirSync(path.dirname(this.dataFile), { recursive: true });
@@ -508,8 +527,8 @@ export class Panel {
     return c;
   }
 
-  private entry(id: number): StoredReplay {
-    const r = this.replays.find((x) => x.id === id);
+  private entry(id: number): Scene {
+    const r = this.book.find(id);
     if (!r) throw new PanelError('Replay nicht gefunden');
     return r;
   }
@@ -521,7 +540,8 @@ export class Panel {
       try {
         if ('wait' in c) await sleep(Math.min(c.wait, maxWaitMs));
         else if ('panel' in c && c.panel === 'waitPlayback') await this.waitPlayback();
-        else if ('panel' in c && c.panel === 'highlightClip') await this.highlightClip();
+        else if ('panel' in c && c.panel === 'highlightClip') await this.clip(this.cfg.replay.highlightTab, this.cfg.replay.highlightMusic || undefined);
+        else if ('panel' in c && c.panel === 'periodClip') await this.clip(this.periodTab(this.breakPeriod ?? this.period()), this.cfg.audio?.music?.input); // the break's scenes run under the general music
         else await this.exclusive(() => this.step(c));
       } catch (e) {
         failure ??= e;
@@ -532,7 +552,7 @@ export class Panel {
 
   private async step(c: Exclude<VmixCall, { wait: number }>): Promise<void> {
     if (!('panel' in c)) { await this.vmix.call(c.Input !== undefined ? { ...c, Input: this.ref(c.Input) } : c); return; }
-    if (c.panel === 'playHighlights') await this.playHighlights();
+    if (c.panel === 'playHighlights') await this.playReel(this.cfg.replay.highlightTab, this.cfg.replay.highlightMusic || undefined);
     else if (c.panel === 'audioGame' || c.panel === 'audioPause') await this.setAudio(c.panel === 'audioGame');
     else if (c.panel === 'breakSound') await this.applyBreakSound();
     else if (c.panel === 'overlaysOff') { this.holdOverlays = true; await this.hideOverlays(); }
@@ -596,26 +616,6 @@ export class Panel {
     }, sp.durationSec * 1000);
   }
 
-  private async ensureMainList(): Promise<void> {
-    if (!this.onHighlightList) return;
-    await this.vmix.call({ Function: `ReplaySelectEvents${this.cfg.replay.mainList}` });
-    this.onHighlightList = false;
-  }
-
-  /**
-   * Applies a replay function to one of our events. vMix does not report how many events its list holds, and has
-   * "LastEvent" and "SelectedEvent" variants only. So an event is addressed by how many were marked after it:
-   * select the last one and step back that many times. Holds as long as events are only created through the panel.
-   */
-  private async eventCall(r: StoredReplay, lastFn: string, selectedFn: string, value?: string | number): Promise<void> {
-    await this.ensureMainList();
-    const back = this.replays.filter((x) => x.id > r.id).length;
-    if (back === 0) { await this.vmix.call({ Function: lastFn, Value: value }); return; }
-    await this.vmix.call({ Function: 'ReplaySelectLastEvent' });
-    for (let i = 0; i < back; i++) await this.vmix.call({ Function: 'ReplaySelectPreviousEvent' });
-    await this.vmix.call({ Function: selectedFn, Value: value });
-  }
-
   private async hideClock(): Promise<void> {
     const sb = this.cfg.scoreboard;
     const inp = this.findInput(sb?.input);
@@ -646,16 +646,25 @@ export class Panel {
       this.clockHidden = false;
       await this.vmix.call({ Function: `OverlayInput${sb.overlay}In`, Input: this.ref(sb.input) });
     }
-    if (this.musicOn) {
-      this.musicOn = false;
-      await this.vmix.call({ Function: 'Pause', Input: this.ref(this.cfg.replay.highlightMusic) });
+    if (this.reelMusic !== null) {
+      const input = this.reelMusic;
+      this.reelMusic = null;
+      await this.vmix.call({ Function: 'Pause', Input: input });
     }
     if (!this.holdOverlays) await this.restoreOverlays();
-    await this.ensureMainList();
   }
 
-  /** Cuts to a clip, plays it from the start and waits until it is over. */
-  private async playClip(input: string): Promise<void> {
+  /**
+   * Cuts to a clip, plays it from the start and waits until it is over.
+   * alreadyOn: vMix may have gone to this clip by itself (it returns to the cued input after a reel); if it is
+   * already playing on program it is left to finish instead of being started a second time.
+   */
+  private async playClip(input: string, alreadyOn = false): Promise<void> {
+    const inp = this.findInput(input);
+    if (alreadyOn && inp && this.activeInput() === inp && inp.state === 'Running') {
+      await sleep(Math.max(0, inp.duration - inp.position) + 200);
+      return;
+    }
     const ref = this.ref(input);
     await this.exclusive(async () => {
       for (const fn of ['Restart', 'CutDirect', 'Play']) await this.vmix.call({ Function: fn, Input: ref });
@@ -664,15 +673,32 @@ export class Panel {
   }
 
   /**
-   * The highlight reel as shown on the stream: intro clips, the scenes, outro clips.
-   * Without highlights only the intro runs once; the outro (the same clips) would look like a repeat.
+   * A reel as shown on the stream: intro clips, all scenes of one event tab, outro clips.
+   * If the tab is empty only the intro runs once; the outro (the same clips) would look like a repeat.
    */
-  private async highlightClip(): Promise<void> {
+  private async clip(tab: number, music: string | undefined): Promise<void> {
     const { intro, outro } = this.cfg.replay.highlightClip;
-    for (const clip of intro) await this.playClip(clip);
-    if (!(await this.exclusive(() => this.playHighlights()))) return;
+    // The intro and outro clips run without the background music; under the scenes it comes from playReel().
+    const background = this.cfg.audio?.music?.input;
+    if (background) await this.exclusive(() => this.vmix.call({ Function: 'Pause', Input: this.ref(background) })).catch(() => {});
+    for (const c of intro) await this.playClip(c);
+    if (!(await this.exclusive(() => this.playReel(tab, music)))) return;
+    if (outro.length) await this.cueAfterReel(outro[0]);
     await this.waitPlayback();
-    for (const clip of outro) await this.playClip(clip);
+    for (const [i, c] of outro.entries()) await this.playClip(c, i === 0);
+  }
+
+  /**
+   * When a reel ends, vMix transitions back by itself to the input in preview. Without this that is the clip shown
+   * before the reel, which would then appear again. So once the replay is on air, the clip that follows is rewound
+   * and put into preview.
+   */
+  private async cueAfterReel(input: string): Promise<void> {
+    for (const end = Date.now() + 3000; !this.playing?.seen && Date.now() < end;) await sleep(200);
+    const ref = this.ref(input);
+    await this.exclusive(async () => {
+      for (const fn of ['Restart', 'Pause', 'PreviewInput']) await this.vmix.call({ Function: fn, Input: ref });
+    }).catch(() => {});
   }
 
   private async waitPlayback(maxMs = 10 * 60_000): Promise<void> {
@@ -681,29 +707,25 @@ export class Panel {
     while (this.playing && Date.now() < giveUp) await sleep(300);
   }
 
-  /** Copies new highlights into vMix's highlight event list (oldest first) and plays that list to output. */
-  private async playHighlights(): Promise<boolean> {
+  /** Plays all scenes of one event tab to output, clean (no overlays), with the given music input under them. */
+  private async playReel(tab: number, music: string | undefined, speed = 1): Promise<boolean> {
     const { replay } = this.cfg;
-    const fresh = this.highlights().filter((r) => !r.copied).reverse();
-    for (const r of fresh) {
-      await this.eventCall(r, 'ReplayCopyLastEvent', 'ReplayCopySelectedEvent', replay.highlightList - 1);
-      r.copied = true;
-    }
-    this.persist();
-    if (!this.replays.some((r) => r.copied)) return false; // nothing to show yet
+    if (!this.book.count(tab)) return false; // nothing to show
     await this.hideOverlays();
-    await this.vmix.call({ Function: `ReplaySelectEvents${replay.highlightList}` });
-    this.onHighlightList = true;
-    if (replay.highlightMusic) {
-      const music = this.ref(replay.highlightMusic);
-      // Missing or failing music must not keep the highlights from playing.
+    if (music) {
+      const input = this.ref(music);
+      // Missing or failing music must not keep the scenes from playing. The highlight track starts from the top,
+      // the general music list just carries on.
       try {
-        for (const fn of ['Restart', 'AudioOn', 'Play']) await this.vmix.call({ Function: fn, Input: music });
-        this.musicOn = true;
+        if (music === replay.highlightMusic) await this.vmix.call({ Function: 'Restart', Input: input });
+        for (const fn of ['AudioOn', 'Play']) await this.vmix.call({ Function: fn, Input: input });
+        this.reelMusic = input;
       } catch { /* play without music */ }
     }
-    await this.vmix.call({ Function: 'ReplayPlayAllEventsToOutput', Channel: replay.channel });
-    this.playing = { id: null, since: Date.now(), seen: false };
+    await this.book.playTab(tab, replay.channel);
+    // The scenes need at least their own length: seconds per camera angle, slower at reduced speed.
+    const minMs = this.book.inTab(tab).reduce((sum, r) => sum + replay.seconds * r.cams.length, 0) * 1000 / speed;
+    this.playing = { id: null, since: Date.now(), seen: false, minUntil: Date.now() + minMs, offSince: 0 };
     return true;
   }
 
@@ -732,7 +754,7 @@ export class Panel {
         } else {
           const started = await this.exclusive(async () => {
             await this.vmix.call({ Function: 'ReplaySetSpeed', Value: this.video.speed / 100 });
-            return this.playHighlights();
+            return this.playReel(this.cfg.replay.highlightTab, this.cfg.replay.highlightMusic || undefined, this.video.speed / 100);
           });
           if (started) await this.waitPlayback();
           await this.exclusive(() => this.vmix.call({ Function: 'ReplaySetSpeed', Value: 1 }));
@@ -796,48 +818,41 @@ export class Panel {
       const mark = replay.marks.find((m) => m.id === id);
       if (!mark) throw new PanelError(`Unbekannte Markierung ${id}`);
       if (!this.replayRecording()) throw new PanelError('Replay-Aufnahme läuft nicht, zuerst starten');
-      const [first, ...rest] = mark.cams.map((c) => this.cam(c).replayCamera);
-      const score = this.score();
-      const time = score?.clock || hhmm(Date.now());
-      await this.ensureMainList();
-      await this.vmix.call({ Function: 'ReplayMarkInOutLive', Value: replay.seconds });
-      await this.vmix.call({ Function: 'ReplayLastEventSingleCameraOn', Value: first });
-      for (const n of rest) await this.vmix.call({ Function: 'ReplayLastEventCameraOn', Value: n });
-      await this.vmix.call({ Function: 'ReplaySetLastEventText', Value: replay.defaultType }).catch(() => {});
-      const entry: StoredReplay = { id: this.nextId++, time, period: score?.period ?? '', cams: mark.cams, type: replay.defaultType, fav: false, copied: false };
-      this.replays = [entry, ...this.replays].slice(0, 200);
+      const cameras = mark.cams.map((c) => this.cam(c).replayCamera);
+      const time = this.score()?.clock || hhmm(Date.now());
+      const scene = await this.book.mark(this.period(), replay.seconds, cameras, { time, cams: mark.cams, type: replay.defaultType, fav: false });
       this.persist();
-      return { id: entry.id, cams: entry.cams };
+      return { id: scene.id, cams: scene.cams };
     },
 
     'replay/type': async ({ id, type }) => {
       const r = this.entry(id);
       if (!this.cfg.replay.types.includes(type)) throw new PanelError(`Unbekannter Typ ${type}`);
-      r.type = type;
+      await this.book.setType(r, type);
+      await this.syncHighlight(r); // e.g. a goal is a highlight without a star
       this.persist();
-      await this.eventCall(r, 'ReplaySetLastEventText', 'ReplaySetSelectedEventText', type);
     },
 
     'replay/cam': async ({ id, cam, on }) => {
       const r = this.entry(id);
-      const number = this.cam(cam).replayCamera;
       const wanted = on ? [...r.cams, cam] : r.cams.filter((c) => c !== cam);
       if (!wanted.length) throw new PanelError('Ein Replay braucht mindestens eine Kamera');
-      await this.eventCall(r, on ? 'ReplayLastEventCameraOn' : 'ReplayLastEventCameraOff', on ? 'ReplaySelectedEventCameraOn' : 'ReplaySelectedEventCameraOff', number);
-      r.cams = this.cfg.cams.map((c) => c.id).filter((c) => wanted.includes(c));
+      await this.book.setCamera(r, this.cam(cam).replayCamera, on, this.cfg.cams.map((c) => c.id).filter((c) => wanted.includes(c)));
       this.persist();
     },
 
     'replay/fav': async ({ id, fav }) => {
-      this.entry(id).fav = fav;
+      const r = this.entry(id);
+      r.fav = fav;
+      await this.syncHighlight(r);
       this.persist();
     },
 
     'replay/play': async ({ id }) => {
       const r = this.entry(id);
       await this.hideClock();
-      await this.eventCall(r, 'ReplayPlayLastEventToOutput', 'ReplayPlaySelectedEventToOutput');
-      this.playing = { id, since: Date.now(), seen: false };
+      await this.book.play(r, true);
+      this.playing = { id, since: Date.now(), seen: false, minUntil: 0, offSince: 0 };
     },
 
     // Plays the scene in vMix's preview only, to check it before it goes on air.
@@ -847,16 +862,24 @@ export class Panel {
       if (!replay) throw new PanelError('Kein Replay-Input in vMix gefunden');
       if (this.activeInput() === replay) throw new PanelError('Replay ist gerade auf Sendung');
       await this.vmix.call({ Function: 'PreviewInput', Input: replay.key });
-      await this.eventCall(r, 'ReplayPlayLastEvent', 'ReplayPlaySelectedEvent');
+      await this.book.play(r, false);
     },
 
     'replay/delete': async ({ id }) => {
-      const r = this.entry(id);
-      await this.eventCall(r, 'ReplayDeleteLastEvent', 'ReplayDeleteSelectedEvent');
-      // Dropping it here as well keeps "how many were marked after it" right for the remaining events.
-      this.replays = this.replays.filter((x) => x !== r);
+      await this.book.remove(this.entry(id));
       if (this.playing?.id === id) this.playing = null;
       this.persist();
+    },
+
+    'replay/period': async ({ period }) => {
+      if (period !== null && period >= this.cfg.replay.periods.length) throw new PanelError('Unbekannter Spielabschnitt');
+      this.periodManual = period;
+      this.persist();
+    },
+
+    'break/period': async ({ period }) => {
+      if (period >= this.cfg.replay.periods.length) throw new PanelError('Unbekannter Spielabschnitt');
+      this.breakPeriod = period;
     },
 
     'audio/preset': async ({ preset }) => { await this.setAudio(preset === 'game'); },
@@ -945,6 +968,9 @@ export class Panel {
       const end = sc?.end;
       if (!sc || !end) throw new PanelError(`Ablauf ${id} hat keinen Abschluss-Knopf`);
       this.schedule.running = { ...this.schedule.running, [sc.id]: false };
+      // The break is over: its clip choice is used up, and a hand-set period moves on to the next one.
+      this.breakPeriod = null;
+      if (this.periodManual !== null) this.periodManual = Math.min(this.periodManual + 1, this.cfg.replay.periods.length - 1);
       this.schedule.anchors[sc.id] = Date.now();
       this.persist();
       this.background(end.label, () => this.run(end.calls));
@@ -970,12 +996,13 @@ export class Panel {
       if (!this.cfg.postGame.highlightVideo) throw new PanelError('Kein Highlight-Video konfiguriert');
       if (this.video.status === 'running') throw new PanelError('Export läuft bereits');
       if (this.vm?.streaming || this.vm?.recording) throw new PanelError('Erst Stream und Aufnahme beenden (Abschluss)');
-      if (!this.highlights().length) throw new PanelError('Keine Highlights markiert');
+      if (!this.book.highlights().length) throw new PanelError('Keine Highlights markiert');
       this.background('Highlight-Video', () => this.exportVideo());
     },
 
-    'highlights/play': async () => {
-      if (!(await this.playHighlights())) throw new PanelError('Keine Highlights markiert');
+    // The break's scenes once more, without intro and outro.
+    'break/clip': async () => {
+      if (!(await this.playReel(this.periodTab(this.breakPeriod ?? this.period()), this.cfg.audio?.music?.input))) throw new PanelError('In diesem Abschnitt sind keine Szenen markiert');
     },
 
     'sim/start': async ({ schedule }) => {
@@ -1002,7 +1029,9 @@ export class Panel {
       if (this.vm?.streaming) throw new PanelError('Nicht möglich, solange der Stream läuft');
       this.ticks = {};
       this.monitor.log = emptyLog();
-      this.replays = [];
+      this.book.reset();
+      this.periodManual = null;
+      this.breakPeriod = null;
       this.schedule = { id: this.cfg.schedules[0].id, anchors: { [this.cfg.schedules[0].id]: this.kickoff() }, rounds: {} };
       this.video.status = 'idle';
       this.fired.clear();

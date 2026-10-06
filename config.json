@@ -44,8 +44,29 @@
   "replay": {
     "seconds": 4,
     "channel": "",
-    "mainList": 1,
-    "highlightList": 2,
+    "periods": [
+      {
+        "label": "1. Drittel",
+        "short": "1",
+        "tab": 11
+      },
+      {
+        "label": "2. Drittel",
+        "short": "2",
+        "tab": 12
+      },
+      {
+        "label": "3. Drittel",
+        "short": "3",
+        "tab": 13
+      },
+      {
+        "label": "Verlängerung",
+        "short": "VL",
+        "tab": 14
+      }
+    ],
+    "highlightTab": 10,
     "autoHighlightTypes": [
       "Tor"
     ],
@@ -315,7 +336,7 @@
       "anchorLabel": "WIEDERANPFIFF",
       "start": {
         "label": "PAUSE STARTEN",
-        "sub": "Ton aus · Einblender aus · Highlight-Clip · Pausenvideo im Loop",
+        "sub": "Ton aus · Einblender aus · Szenen des Drittels · Pausenvideo im Loop",
         "note": "Zurück mit dem Knopf ZURÜCK ZUM SPIEL",
         "minutes": 10,
         "calls": [
@@ -326,7 +347,7 @@
             "panel": "overlaysOff"
           },
           {
-            "panel": "highlightClip"
+            "panel": "periodClip"
           },
           {
             "Function": "LoopOn",
@@ -353,6 +374,14 @@
         "label": "ZURÜCK ZUM SPIEL",
         "sub": "Lidl-Clip, dann Live-Bild mit Ton",
         "calls": [
+          {
+            "Function": "Pause",
+            "Input": "General Music*"
+          },
+          {
+            "Function": "AudioOff",
+            "Input": "Pausenvideo_FBRiders_Loop_5min.mp4"
+          },
           {
             "Function": "Restart",
             "Input": "Presenter - Lidl Schweiz Partner Unihockey Women v2.mp4"
@@ -383,15 +412,7 @@
             "Input": "Pausenvideo_FBRiders_Loop_5min.mp4"
           },
           {
-            "Function": "AudioOff",
-            "Input": "Pausenvideo_FBRiders_Loop_5min.mp4"
-          },
-          {
             "panel": "logosOn"
-          },
-          {
-            "Function": "Pause",
-            "Input": "General Music*"
           }
         ]
       },
@@ -399,7 +420,7 @@
         {
           "at": "-10:00",
           "label": "Pausenbeginn",
-          "sub": "Mikrofone stumm, alle Einblender aus, Liga- und Riders-Intro, Highlight-Clip, Outro"
+          "sub": "Mikrofone stumm, alle Einblender aus, Intros, Szenen des Drittels, Outro"
         },
         {
           "at": "-08:00",

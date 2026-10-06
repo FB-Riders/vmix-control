@@ -93,7 +93,7 @@ export function BreakPage({ state, embedded }: { state: PanelState; embedded?: b
           <>
             <Label title="TON" hint="schaltet automatisch" />
             <span className="text-xs leading-relaxed font-light text-muted-foreground">
-              Pausenbeginn: Mikrofone stumm. Highlights: Musik an und wieder aus. Pausenvideo: eigener Ton oder Musik, je nach Wahl unten. Zurück zum Spiel: Mikrofone an. Die Knöpfe sind nur zum Eingreifen.
+              Pausenbeginn: Mikrofone stumm. Szenen: mit der Musikliste. Pausenvideo: eigener Ton oder Musik, je nach Wahl unten. Zurück zum Spiel: Mikrofone an. Die Knöpfe sind nur zum Eingreifen.
             </span>
             <div className="grid grid-cols-2 gap-3">
               <AudioPresetButton audio={audio} preset="game" desktop />
@@ -126,14 +126,34 @@ export function BreakPage({ state, embedded }: { state: PanelState; embedded?: b
         )}
         {state.music && <MusicRow music={state.music} />}
 
-        <Label title="HIGHLIGHTS" hint={`${replay.highlightCount} Szenen`} className="mt-3" />
+        <Label title="SZENEN FÜR DIE PAUSE" hint={`${replay.periods[replay.breakPeriod]?.count ?? 0} Szenen`} className="mt-3" />
+        <div className="grid auto-cols-fr grid-flow-col gap-3">
+          {replay.periods.map((p, i) => (
+            <Button
+              key={p.tab}
+              variant="outline"
+              className={cn(
+                'h-11 flex-col gap-px border-2 border-secondary bg-secondary px-0 text-[13px] font-black',
+                i === replay.breakPeriod && 'border-muted-foreground bg-muted-foreground text-background hover:bg-muted-foreground hover:text-background',
+              )}
+              aria-pressed={i === replay.breakPeriod}
+              onClick={() => act('break/period', { period: i })}
+            >
+              {p.label}
+              <span className="text-[10px] font-light">{p.count} Szenen</span>
+            </Button>
+          ))}
+        </div>
+        <span className="text-xs leading-relaxed font-light text-muted-foreground">
+          PAUSE STARTEN zeigt alle Replays dieses Abschnitts (vMix-Tab {replay.periods[replay.breakPeriod]?.tab}), nicht nur die mit ★.
+        </span>
         <Button
           variant="outline"
-          disabled={replay.highlightCount === 0}
+          disabled={!replay.periods[replay.breakPeriod]?.count}
           className="h-11 border-2 border-secondary bg-secondary text-[13px] font-black"
-          onClick={() => act('highlights/play')}
+          onClick={() => act('break/clip')}
         >
-          <span className="text-primary">▶</span> HIGHLIGHT-CLIP NOCHMALS ABSPIELEN
+          <span className="text-primary">▶</span> SZENEN NOCHMALS ABSPIELEN
         </Button>
 
         {sponsor && (

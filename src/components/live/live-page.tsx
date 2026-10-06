@@ -1,7 +1,7 @@
 import type { PanelState } from '@shared/state';
 import { AudioPresetButton, MusicButton } from '@/components/audio';
 import { Caption } from '@/components/caption';
-import { MarkButtons } from '@/components/replay/mark-buttons';
+import { MarkButtons, PeriodSelect } from '@/components/replay/mark-buttons';
 import { ReplayList } from '@/components/replay/replay-list';
 import { SponsorButton } from '@/components/sponsor';
 import type { Marking } from '@/hooks/use-marking';
@@ -34,8 +34,9 @@ export function LivePage({ state, marking }: { state: PanelState; marking: Marki
               {pending ? `sonst nach 5 s: ${replay.defaultType}` : '★ = Highlight-Video'}
             </span>
           </div>
+          <PeriodSelect replay={replay} />
           <MarkButtons replay={replay} marking={marking} recording={state.replayRecording} />
-          <ReplayList replay={replay} visible={4} currentPeriod={state.score?.period ?? ''} />
+          <ReplayList replay={replay} visible={3} />
         </section>
 
         {(audio || sponsor || state.music) && (

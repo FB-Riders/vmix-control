@@ -12,6 +12,8 @@ export const actionSchemas = {
   'replay/play': z.object({ id: z.number().int() }),
   'replay/preview': z.object({ id: z.number().int() }),
   'replay/delete': z.object({ id: z.number().int() }),
+  'replay/period': z.object({ period: z.number().int().nonnegative().nullable() }), // null = follow the scoreboard
+  'break/period': z.object({ period: z.number().int().nonnegative() }),
   'audio/preset': z.object({ preset: z.enum(['game', 'pause']) }),
   'audio/source': z.object({ id: z.string(), on: z.boolean() }),
   music: z.object({ play: z.boolean() }),
@@ -38,7 +40,7 @@ export const actionSchemas = {
   'sim/start': z.object({ schedule: z.string().optional() }),
   'sim/stop': z.object({}),
   'schedule/action': z.object({ step: z.number().int().nonnegative(), id: z.string().optional() }),
-  'highlights/play': z.object({}),
+  'break/clip': z.object({}),
 } as const;
 
 export type ActionName = keyof typeof actionSchemas;

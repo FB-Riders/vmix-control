@@ -43,6 +43,16 @@ The **controlling list** is filled from what actually went out: when the stream 
 program (and in which break), share of stream time with logos, drop-outs, stalls. vMix does not report bitrate,
 dropped frames or the Hub's status, so those are not shown.
 
+## How replays are filed in vMix
+
+The panel keeps a book of vMix Replay's event tabs (`server/replays.ts`), because vMix does not report which events a
+tab holds. Every scene lives in the tab of its period (tabs 11 to 14 by default); every highlight additionally as a
+copy in the highlight tab (10). The period comes from the scoreboard or is set by hand on the live screen. vMix can
+only act on the last or the selected event of the tab that is showing, so the panel switches to the tab, selects the
+last event and steps back to the one that is meant. This only stays correct if events in these tabs are created,
+copied and deleted through the panel alone, and if the tabs are empty when a new game starts ("Neues Spiel" clears
+the panel's book, not vMix).
+
 ## Automatic steps
 
 Run-down steps with `"auto": true` are triggered by the panel at their time, as long as the stream is running and
@@ -72,7 +82,8 @@ ends up in vMix's recording folder. Clip lengths come from vMix, the scene lengt
 | `scoreboard` | Title input and its field names for score, period, clock and team names. `overlay` is the overlay channel it runs on. Remove the block if there is none. |
 | `replay.seconds` | Length of a marked replay (seconds back from live). |
 | `replay.marks` | The mark buttons and which cameras each one keeps in the event. |
-| `replay.mainList` / `highlightList` | vMix replay event lists (1–20) used for marking and for the highlight video. |
+| `replay.periods` | One vMix Replay event tab per period (`label`, `short`, `tab`). New scenes are created in the tab of the current period. |
+| `replay.highlightTab` | Event tab that holds copies of all highlights; the highlight video and the end-of-game clip play it. |
 | `replay.autoHighlightTypes` | Replay types that always count as highlights (goals). Everything else needs the ★. |
 | `replay.highlightMusic` | Audio input started with the highlight reel (`Restart`, `AudioOn`, `Play`) and paused when the scenes are over. |
 | `replay.hideScoreboard` | Take the scoreboard overlay off while a replay plays and put it back afterwards. |
@@ -99,12 +110,13 @@ and the panel's replay list (also needed after a test run on match day).
 | LIVE row | `CutDirect` |
 | PREVIEW row | `PreviewInput` |
 | STREAM STARTEN / `stopAll` | `Start/StopStreaming`, `Start/StopRecording`, `ReplayStart/StopRecording` |
-| Replay mark | `ReplayMarkInOutLive`, `ReplayLastEventSingleCameraOn`, `ReplayLastEventCameraOn`, `ReplaySetLastEventText` |
+| Replay mark | `ReplaySelectEventsN` (tab of the current period), `ReplayMarkInOutLive`, `ReplayLastEventSingleCameraOn`, `ReplayLastEventCameraOn`, `ReplaySetLastEventText` |
 | Replay type / camera chips | `ReplaySet…EventText`, `Replay…EventCameraOn/Off`; older events are reached with `ReplaySelectLastEvent` + `ReplaySelectPreviousEvent` |
 | Replay PLAY | `ReplayPlayLastEventToOutput`, or select + `ReplayPlaySelectedEventToOutput` for older ones (transition/stinger comes from vMix's replay settings). Events are addressed by how many were marked after them, so create replay events only through the panel. |
 | Replay preview (eye button) | `PreviewInput` on the replay input, then `ReplayPlayLastEvent` / `ReplayPlaySelectedEvent`. Refused while the replay is on air. |
 | Replay delete | `ReplayDeleteLastEvent` / `ReplayDeleteSelectedEvent`. A copy already in the highlight list stays there. |
-| ★ / highlights | The star is kept in the panel. `playHighlights` copies new highlights to the highlight list (`ReplayCopy…Event`), then `ReplaySelectEventsN` + `ReplayPlayAllEventsToOutput`, and switches back to the main list afterwards. While the highlights play, every overlay channel, league logos included, is taken off (`OverlayInputNOut`) and put back afterwards. A highlight un-starred after it was copied stays in vMix's list. |
+| ★ / goals | Copy into the highlight tab at once (`ReplayCopy…Event`, target tab counted from 0); removing the star deletes that copy again. Type and camera changes are applied to the original and the copy. |
+| Break clip / end clip | `ReplaySelectEventsN` + `ReplayPlayAllEventsToOutput` on the period's tab resp. the highlight tab, with all overlays off and the highlight music. |
 | Highlight video | `StartRecording`, per clip `Restart` + `CutDirect` + `Play`, `ReplaySetSpeed` + highlights, `StopRecording` |
 | Audio | `AudioOn` / `AudioOff`; meters come from `meterF1/F2` in the vMix state |
 | Sponsor, logos | `OverlayInputNIn` / `OverlayInputNOut` |
