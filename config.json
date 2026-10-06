@@ -1,0 +1,570 @@
+{
+  "port": 8090,
+  "vmix": {
+    "host": "192.168.0.47",
+    "port": 8088
+  },
+  "cams": [
+    {
+      "id": "L",
+      "role": "Hintertor links",
+      "input": "Links",
+      "replayCamera": 2
+    },
+    {
+      "id": "M",
+      "role": "Führung",
+      "input": "Haupt",
+      "replayCamera": 1
+    },
+    {
+      "id": "R",
+      "role": "Hintertor rechts",
+      "input": "Rechts",
+      "replayCamera": 3
+    }
+  ],
+  "scoreboard": {
+    "input": "LUPL-SU_scoreboard_clock.gtzip",
+    "home": "TxtHomeScore.Text",
+    "away": "TxtAwayScore.Text",
+    "period": "TxtClockPeriod.Text",
+    "periodFormat": "{}. Drittel",
+    "clock": [
+      "TxtClockTimeM10.Text",
+      "TxtClockTimeM01.Text",
+      "TxtClockTimeT.Text",
+      "TxtClockTimeS10.Text",
+      "TxtClockTimeS01.Text"
+    ],
+    "homeName": "TxtHomeName.Text",
+    "awayName": "TxtAwayName.Text",
+    "overlay": 3
+  },
+  "replay": {
+    "seconds": 4,
+    "channel": "",
+    "mainList": 1,
+    "highlightList": 2,
+    "autoHighlightTypes": [
+      "Tor"
+    ],
+    "hideScoreboard": true,
+    "highlightMusic": "Highlights - Music",
+    "defaultType": "Szene",
+    "types": [
+      "Tor",
+      "Strafe",
+      "Parade",
+      "Chance"
+    ],
+    "marks": [
+      {
+        "id": "L",
+        "label": "◀ L + M",
+        "sub": "Tor links",
+        "cams": [
+          "L",
+          "M"
+        ]
+      },
+      {
+        "id": "M",
+        "label": "M",
+        "sub": "nur Mitte",
+        "cams": [
+          "M"
+        ]
+      },
+      {
+        "id": "R",
+        "label": "M + R ▶",
+        "sub": "Tor rechts",
+        "cams": [
+          "M",
+          "R"
+        ]
+      }
+    ]
+  },
+  "audio": {
+    "sources": [
+      {
+        "id": "pult",
+        "name": "Mischpult · Kommentar",
+        "short": "Pult",
+        "input": "Audio UR44C Input 1+2",
+        "role": "commentary"
+      },
+      {
+        "id": "halle",
+        "name": "CAM M · Hallenton",
+        "short": "CAM M",
+        "input": "Haupt",
+        "role": "atmo"
+      }
+    ],
+    "loudnessTarget": -16,
+    "loudnessTolerance": 3,
+    "loudnessOffset": 0,
+    "commentaryOverAtmo": 10
+  },
+  "sponsor": {
+    "inputs": [
+      "LUPL-SU_sponsor.gtzip"
+    ],
+    "overlay": 2,
+    "intervalSec": 180,
+    "durationSec": 10
+  },
+  "logos": [
+    {
+      "name": "League ID + Livestream-Pro-Logo",
+      "input": "LUPL-SU_league_id.gtzip",
+      "overlay": 4
+    }
+  ],
+  "schedules": [
+    {
+      "id": "vorspiel",
+      "title": "VOR SPIEL",
+      "anchorLabel": "SPIELBEGINN",
+      "anchorTime": "20:00",
+      "steps": [
+        {
+          "at": "-30:00",
+          "label": "Stream-Start in vMix",
+          "sub": "Bild und Ton im Hub-Admin prüfen"
+        },
+        {
+          "at": "-15:00",
+          "label": "Hub schaltet live",
+          "sub": "Opener auf Beauty Shot, Werbeslot 1",
+          "tag": "auto"
+        },
+        {
+          "at": "-08:00",
+          "label": "Liga-Trailer, Kommentar startet",
+          "sub": "muss im Stream sichtbar sein",
+          "hero": "Liga-Trailer, dann Kommentar live",
+          "action": {
+            "label": "TRAILER STARTEN",
+            "auto": true,
+            "calls": [
+              {
+                "Function": "Restart",
+                "Input": "Intro L-UPL.mp4"
+              },
+              {
+                "Function": "CutDirect",
+                "Input": "Intro L-UPL.mp4"
+              },
+              {
+                "Function": "Play",
+                "Input": "Intro L-UPL.mp4"
+              }
+            ]
+          }
+        },
+        {
+          "at": "-07:00",
+          "label": "Aufstellungen Gast, Heim",
+          "sub": "Kamera M",
+          "action": {
+            "label": "CAM M",
+            "auto": true,
+            "calls": [
+              {
+                "Function": "CutDirect",
+                "Input": "Haupt"
+              }
+            ]
+          }
+        },
+        {
+          "at": "-05:00",
+          "label": "Einlauf, Schiris, Starting 6",
+          "sub": "Kamera L, M, R im Wechsel"
+        },
+        {
+          "at": "-00:22",
+          "label": "Mobiliar-Clip",
+          "sub": "Ende spätestens 10 s vor Bully, Ton auf SPIEL",
+          "durationSec": 12,
+          "action": {
+            "label": "MOBILIAR-CLIP",
+            "auto": true,
+            "calls": [
+              {
+                "Function": "Restart",
+                "Input": "mob_jubel_web_D.mp4"
+              },
+              {
+                "Function": "CutDirect",
+                "Input": "mob_jubel_web_D.mp4"
+              },
+              {
+                "Function": "Play",
+                "Input": "mob_jubel_web_D.mp4"
+              },
+              {
+                "panel": "audioGame"
+              }
+            ]
+          }
+        },
+        {
+          "at": "-00:10",
+          "label": "Anspiel: Live-Bild",
+          "sub": "Kamera M Totale",
+          "action": {
+            "label": "CAM M LIVE",
+            "auto": true,
+            "calls": [
+              {
+                "Function": "CutDirect",
+                "Input": "Haupt"
+              }
+            ]
+          }
+        },
+        {
+          "at": "00:00",
+          "label": "1. Drittel",
+          "sub": "Wechsel auf den Live-Screen"
+        }
+      ]
+    },
+    {
+      "id": "pause",
+      "title": "PAUSE",
+      "anchorLabel": "WIEDERANPFIFF",
+      "start": {
+        "label": "PAUSE STARTEN",
+        "sub": "Ton aus · Highlight-Clip",
+        "note": "Lidl-Clip + Anspiel laufen danach automatisch vor dem Bully",
+        "minutes": 10,
+        "calls": [
+          {
+            "panel": "audioPause"
+          },
+          {
+            "panel": "playHighlights"
+          }
+        ]
+      },
+      "steps": [
+        {
+          "at": "-10:00",
+          "label": "Pausenbeginn",
+          "sub": "Resultat, Highlight-Clip, Werbeslot"
+        },
+        {
+          "at": "-00:22",
+          "label": "Lidl-Clip",
+          "sub": "Ende spätestens 10 s vor Bully",
+          "durationSec": 12,
+          "action": {
+            "label": "LIDL-CLIP",
+            "auto": true,
+            "calls": [
+              {
+                "Function": "Restart",
+                "Input": "Presenter - Lidl Schweiz Partner Unihockey Women v2.mp4"
+              },
+              {
+                "Function": "CutDirect",
+                "Input": "Presenter - Lidl Schweiz Partner Unihockey Women v2.mp4"
+              },
+              {
+                "Function": "Play",
+                "Input": "Presenter - Lidl Schweiz Partner Unihockey Women v2.mp4"
+              }
+            ]
+          }
+        },
+        {
+          "at": "-00:10",
+          "label": "Anspiel: Live-Bild",
+          "sub": "Kamera M Totale, Ton auf SPIEL",
+          "action": {
+            "label": "CAM M LIVE",
+            "auto": true,
+            "calls": [
+              {
+                "Function": "CutDirect",
+                "Input": "Haupt"
+              },
+              {
+                "panel": "audioGame"
+              }
+            ]
+          }
+        },
+        {
+          "at": "00:00",
+          "label": "Anspiel"
+        }
+      ]
+    }
+  ],
+  "preGame": {
+    "streamLeadMinutes": 30,
+    "reminder": "Letztes Mal ging der Stream erst 4 Min vor Spielbeginn live. Dadurch fehlten Vorlauf und Liga-Trailer.",
+    "emergency": {
+      "title": "Notfall: Technik fällt aus",
+      "text": "Spätestens nach 5 Min mit dem Backup-Handy weiter streamen (swiss unihockey App, Stativ bei der Führungskamera, Powerbank)."
+    },
+    "checklist": [
+      {
+        "id": "net",
+        "title": "Internet stabil",
+        "sub": "Upload mind. 15 Mbit, Kabel statt WLAN"
+      },
+      {
+        "id": "cams",
+        "title": "Alle 3 Kamerasignale da",
+        "sub": "L, M, R stabil im vMix",
+        "auto": "cams"
+      },
+      {
+        "id": "fps",
+        "title": "Alles auf 50p",
+        "sub": "Kameras und Capture-Karten 50 fps, nicht 59.94/60"
+      },
+      {
+        "id": "wb",
+        "title": "Weissabgleich, Kameras waagrecht",
+        "sub": "alle Kameras sehen gleich aus"
+      },
+      {
+        "id": "audio",
+        "title": "Kommentar kommt an, beide Kanäle",
+        "sub": "Mischpult links und rechts gleich"
+      },
+      {
+        "id": "level",
+        "title": "Testsprache auf −16 LUFS",
+        "sub": "Kommentar ca. 10 dB über Atmo, Limiter Master an"
+      },
+      {
+        "id": "replay",
+        "title": "Replays gelöscht",
+        "sub": "Highlight-Playlist leer"
+      },
+      {
+        "id": "clock",
+        "title": "Matchuhr getestet",
+        "sub": "offizielle L-UPL Women Grafik"
+      },
+      {
+        "id": "gfx",
+        "title": "Einblender und Clips geladen",
+        "sub": "Liga-Trailer, Mobiliar, Lidl, Stinger, Werbeslots"
+      },
+      {
+        "id": "logos",
+        "title": "League ID und Livestream-Pro-Logo an",
+        "sub": "bleiben bis Stream-Ende eingeblendet",
+        "auto": "logos"
+      },
+      {
+        "id": "key",
+        "title": "Stream-Key aus dem Hub eingetragen",
+        "sub": "Test im Hub-Admin: Bild und Ton kommen an"
+      },
+      {
+        "id": "backup",
+        "title": "Backup-Handy bereit",
+        "sub": "SIM, App, Stativ, Halterung, Powerbank"
+      },
+      {
+        "id": "interview",
+        "title": "2 Interviews geplant",
+        "sub": "im SR-Meeting angekündigt"
+      },
+      {
+        "id": "rec",
+        "title": "Lokales Recording eingestellt",
+        "sub": "H264, 8 Mbit, 50p"
+      }
+    ]
+  },
+  "controlling": [
+    {
+      "label": "Stream 15 Min vor Spielbeginn live",
+      "check": "streamLead",
+      "minutes": 15
+    },
+    {
+      "label": "Ganzes Spiel ohne Unterbruch",
+      "check": "noInterruption"
+    },
+    {
+      "label": "Liga-Trailer vor dem Spiel",
+      "check": "onAir",
+      "input": "Intro L-UPL.mp4"
+    },
+    {
+      "label": "Mobiliar-Clip vor 1. Bully",
+      "check": "onAir",
+      "input": "mob_jubel_web_D.mp4"
+    },
+    {
+      "label": "Lidl-Clip vor 2. Drittel",
+      "check": "onAir",
+      "input": "Presenter - Lidl Schweiz Partner Unihockey Women v2.mp4",
+      "schedule": "pause",
+      "round": 1
+    },
+    {
+      "label": "Lidl-Clip vor 3. Drittel",
+      "check": "onAir",
+      "input": "Presenter - Lidl Schweiz Partner Unihockey Women v2.mp4",
+      "schedule": "pause",
+      "round": 2
+    },
+    {
+      "label": "League ID + Livestream-Pro-Logo",
+      "check": "logos"
+    },
+    {
+      "label": "Lautheit −16 LUFS, keine Tonlöcher",
+      "check": "audio"
+    },
+    {
+      "label": "Kein Einspieler ohne Bild",
+      "check": "stalls"
+    },
+    {
+      "label": "Highlight-Video mit Mobiliar und Lidl",
+      "check": "videoExported",
+      "post": true
+    },
+    {
+      "label": "Highlights hochgeladen ≤ 4 h",
+      "check": "ticks",
+      "ids": [
+        "video:uploaded"
+      ],
+      "post": true
+    },
+    {
+      "label": "2 Interviews im Game-Feed",
+      "check": "ticks",
+      "ids": [
+        "iv:pause",
+        "iv:end"
+      ],
+      "post": true
+    }
+  ],
+  "postGame": {
+    "steps": [
+      {
+        "id": "result",
+        "title": "Resultat einblenden",
+        "info": "Emotionen, Halle"
+      },
+      {
+        "id": "bpAway",
+        "title": "Best Player Gast, Werbeslot 7"
+      },
+      {
+        "id": "bpHome",
+        "title": "Best Player Heim"
+      },
+      {
+        "id": "comment",
+        "title": "Kommentar Ende"
+      },
+      {
+        "id": "clip",
+        "title": "Highlight-Clip max. 1 Min, mit Stinger",
+        "info": "aus ★-Szenen"
+      },
+      {
+        "id": "stop",
+        "title": "Liga-Trailer Short, Stopp"
+      }
+    ],
+    "finish": {
+      "label": "ABSCHLUSS STARTEN",
+      "sub": "Highlight-Clip · Liga-Trailer Short · Stream-Stopp",
+      "calls": [
+        {
+          "panel": "audioPause"
+        },
+        {
+          "panel": "playHighlights"
+        },
+        {
+          "panel": "waitPlayback"
+        },
+        {
+          "Function": "Restart",
+          "Input": "Highlights - Intros - Only Women 4k v1.mp4"
+        },
+        {
+          "Function": "CutDirect",
+          "Input": "Highlights - Intros - Only Women 4k v1.mp4"
+        },
+        {
+          "Function": "Play",
+          "Input": "Highlights - Intros - Only Women 4k v1.mp4"
+        },
+        {
+          "wait": 5000
+        },
+        {
+          "panel": "stopAll"
+        }
+      ]
+    },
+    "interviews": [
+      {
+        "id": "pause",
+        "title": "Interview Pause",
+        "sub": "Clip im Hub in den Game-Feed laden"
+      },
+      {
+        "id": "end",
+        "title": "Interview nach dem Spiel",
+        "sub": "spätestens 10 Min nach Handshake"
+      }
+    ],
+    "highlightVideo": {
+      "targetMinutes": [
+        3,
+        5
+      ],
+      "speeds": [
+        75,
+        100
+      ],
+      "template": [
+        {
+          "title": "Highlight-Intro",
+          "input": "Highlights - Intros - Only Women 4k v1.mp4"
+        },
+        {
+          "title": "Mobiliar-Clip",
+          "input": "mob_jubel_web_D.mp4",
+          "required": true
+        },
+        {
+          "highlights": true
+        },
+        {
+          "title": "Lidl-Clip",
+          "input": "Presenter - Lidl Schweiz Partner Unihockey Women v2.mp4",
+          "required": true
+        },
+        {
+          "title": "Liga-Trailer kurz",
+          "input": "Highlights - Intros - Only Women 4k v1.mp4"
+        }
+      ]
+    }
+  }
+}

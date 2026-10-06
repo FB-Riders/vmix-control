@@ -1,0 +1,77 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/kumbh-sans";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: 'Kumbh Sans Variable', Poppins, Montserrat, Arial, sans-serif;
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --color-dim: var(--dim);
+  --radius-sm: calc(var(--radius) * 0.5);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius);
+  --radius-xl: var(--radius);
+}
+
+/* FB Riders palette. The panel is dark only: black ground, Riders red for everything that is on air. */
+:root {
+  --background: #000000;
+  --foreground: #FFFFFF;
+  --card: #292929;
+  --card-foreground: #FFFFFF;
+  --popover: #000000;
+  --popover-foreground: #FFFFFF;
+  --primary: #CD1619;
+  --primary-foreground: #FFFFFF;
+  --secondary: #292929;
+  --secondary-foreground: #E3E3E3;
+  --muted: #292929;
+  --muted-foreground: #E3E3E3;
+  --accent: #292929;
+  --accent-foreground: #FFFFFF;
+  --destructive: #CD1619;
+  --border: #292929;
+  --input: #5A5A5A;
+  --ring: #FFFFFF;
+  --dim: #8A8A8A;
+  --radius: 0.25rem;
+  color-scheme: dark;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    -webkit-tap-highlight-color: transparent;
+  }
+  html {
+    @apply font-sans;
+  }
+  html, body, #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-background text-foreground select-none;
+    overscroll-behavior: none;
+    touch-action: manipulation;
+  }
+}
