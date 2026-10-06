@@ -22,8 +22,9 @@ names in `config.json` that vMix does not know; the same warnings show at the bo
   - **Live**: cameras, replays, audio, run-down, controlling list. Keyboard: `F1–F3` live, `1–3` preview, `Q W E` mark
     replay, `A S D F` replay type, `G` sponsor, `H J` audio game / break. Shortcuts only work while the browser
     window has focus, not while you are working in vMix.
-  - **Pause**: choose the break length, PAUSE STARTEN, countdown to the bully, the break run-down, audio, highlights
-    and sponsors. The panel switches to this screen when the break is started and back to Live at the bully.
+  - **Pause**: choose the break length, PAUSE STARTEN, then ZURÜCK ZUM SPIEL when play resumes (the `end` block of
+    the break run-down); in between the countdown, audio, highlights and sponsors. The panel switches to this screen
+    when the break is started and back to Live when it is ended.
   - **Nach dem Spiel**: wrap-up steps, ABSCHLUSS (ends the stream), highlight video, interviews, full controlling list.
 
 ## What the panel checks by itself
@@ -67,7 +68,7 @@ ends up in vMix's recording folder. Clip lengths come from vMix, the scene lengt
 
 | Key | Meaning |
 | --- | --- |
-| `cams[].input` | vMix input name (or number / GUID) of each camera. `replayCamera` is its camera number 1–8 in vMix Replay. vMix plays the angles of an event in that order, so the camera that should come first needs the lowest number. |
+| `cams[].input` | vMix input name (or number / GUID) of each camera. Anywhere an input is named, `Name*` matches by prefix, which is needed for list inputs whose title includes the current item. `replayCamera` is its camera number 1–8 in vMix Replay. vMix plays the angles of an event in that order, so the camera that should come first needs the lowest number. |
 | `scoreboard` | Title input and its field names for score, period, clock and team names. `overlay` is the overlay channel it runs on. Remove the block if there is none. |
 | `replay.seconds` | Length of a marked replay (seconds back from live). |
 | `replay.marks` | The mark buttons and which cameras each one keeps in the event. |
@@ -75,17 +76,17 @@ ends up in vMix's recording folder. Clip lengths come from vMix, the scene lengt
 | `replay.autoHighlightTypes` | Replay types that always count as highlights (goals). Everything else needs the ★. |
 | `replay.highlightMusic` | Audio input started with the highlight reel (`Restart`, `AudioOn`, `Play`) and paused when the scenes are over. |
 | `replay.hideScoreboard` | Take the scoreboard overlay off while a replay plays and put it back afterwards. |
-| `audio` | `sources` are the inputs the SPIEL / PAUSE buttons switch (`role`: `commentary` / `atmo`). `loudnessTarget`, `loudnessTolerance`, `loudnessOffset`, `commentaryOverAtmo` drive the loudness watchdog. |
+| `audio` | `sources` are the inputs the SPIEL / PAUSE buttons switch (`role`: `commentary` / `atmo`). `music` is a background music input with its own play / pause control. `breakVideo` names the break video; the PAUSE screen can swap its sound for the music (applied by the `breakSound` panel step). `loudnessTarget`, `loudnessTolerance`, `loudnessOffset`, `commentaryOverAtmo` drive the loudness watchdog. |
 | `sponsor` | Inputs shown in rotation on the given overlay channel, every `intervalSec` for `durationSec`. |
 | `logos` | League logo inputs and their overlay channels. All of them must be on for LOGOS ● and the controlling. |
-| `schedules` | Run-downs. The first one is the pre-game run-down, its anchor is the kickoff. `at` is relative to the anchor (`-08:00` = 8 min before). An `action` is a list of calls (below), with `"auto": true` it runs by itself. A `start` block gives the run-down a one-tap start button (PAUSE STARTEN) that sets the anchor to now + `minutes` and runs its calls. |
-| `preGame` | `streamLeadMinutes`, `muteOnStreamStart` (STREAM STARTEN mutes the audio sources first), `recordGame` (default of the "Spiel lokal aufnehmen" switch), the `reminder` text, the `emergency` card and the `checklist`. Checklist items with `auto` (`cams`, `logos`) are ticked by the panel. |
+| `schedules` | Run-downs. The first one is the pre-game run-down, its anchor is the kickoff. `at` is relative to the anchor (`-08:00` = 8 min before). An `action` is a list of calls (below), with `"auto": true` it runs by itself. A `start` block gives the run-down a one-tap start button (PAUSE STARTEN) that sets the anchor to now + `minutes` and runs its calls; an `end` block gives it a one-tap way out (ZURÜCK ZUM SPIEL). |
+| `preGame` | `streamLeadMinutes`, `onStreamStart` (calls STREAM STARTEN runs first, e.g. mute the microphones and start music), `recordGame` (default of the "Spiel lokal aufnehmen" switch), the `reminder` text, the `emergency` card and the `checklist`. Checklist items with `auto` (`cams`, `logos`) are ticked by the panel. |
 | `controlling` | The controlling list. `check` is one of `streamLead`, `onAir` (input was on program; optionally in the n-th `round` of a `schedule`), `logos`, `audio`, `stalls`, `noInterruption`, `videoExported`, `ticks`. `post: true` shows the item only after the game. |
 | `postGame` | Wrap-up `steps`, the `finish` sequence (ABSCHLUSS), `interviews` and the `highlightVideo` template. |
 
 Calls in `action.calls`, `start.calls` and `finish.calls` are vMix API calls such as
 `{ "Function": "CutDirect", "Input": "Resultat" }`, pauses `{ "wait": 500 }`, or panel steps `{ "panel": "…" }`:
-`audioPause`, `audioGame`, `playHighlights`, `waitPlayback` (until the replay is over), `startAll`, `stopAll`
+`audioPause`, `audioGame`, `logosOn`, `logosOff`, `highlightClip` (intro clips, highlight reel, outro clips from `replay.highlightClip`; without highlights only the intro clips run), `playHighlights`, `waitPlayback` (until the replay is over), `startAll`, `stopAll`
 (stream, recording and replay recording). If one call fails the rest still runs and the failure shows as an alert.
 
 Restart `start.bat` after changing `config.json`. "Neues Spiel" on the pre-game screen clears checklist, controlling

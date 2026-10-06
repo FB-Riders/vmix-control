@@ -56,6 +56,7 @@ export interface ScheduleStep {
   sub: string;
   tag: string; // e.g. "auto"
   auto: boolean; // the server triggers the action itself when the step is due
+  pending: boolean; // must be triggered by the operator and has not been yet
   hero: string;
   durationSec: number;
   action: string | null; // button label, if the step triggers something in vMix
@@ -70,6 +71,8 @@ export interface ScheduleState {
   all: { id: string; title: string; anchorLabel: string }[];
   starts: { id: string; label: string; sub: string; note: string }[]; // run-downs that can be started with one tap, e.g. the break
   start: { label: string; sub: string; note: string; minutes: number } | null; // this run-down's own one-tap start
+  end: { label: string; sub: string } | null; // one-tap way out of it, e.g. back to the game
+  running: boolean; // started with its one-tap start and not ended yet
   autoRun: boolean; // automatic steps are armed
   sim: SimState | null; // test run of the pre-game run-down, or its result
 }
@@ -147,6 +150,8 @@ export interface PanelState {
   score: Score | null;
   replay: ReplayState;
   audio: AudioState | null;
+  music: { name: string; track: string; playing: boolean } | null; // background music input
+  breakSound: { music: boolean } | null; // break video: its own sound, or muted with the background music over it
   sponsor: SponsorState | null;
   logos: { visible: boolean } | null; // all league logos are on
   health: HealthState;

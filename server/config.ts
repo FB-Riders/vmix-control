@@ -5,7 +5,7 @@ import { z } from 'zod';
 const vmixCall = z.union([
   z.object({ wait: z.number().positive() }),
   // Things the panel does itself rather than a single vMix function.
-  z.object({ panel: z.enum(['audioGame', 'audioPause', 'playHighlights', 'waitPlayback', 'startAll', 'stopAll']) }),
+  z.object({ panel: z.enum(['audioGame', 'audioPause', 'playHighlights', 'highlightClip', 'breakSound', 'waitPlayback', 'startAll', 'stopAll', 'logosOn', 'logosOff']) }),
   z.object({
     Function: z.string(),
     Input: z.union([z.string(), z.number()]).optional(),
@@ -23,6 +23,8 @@ const schedule = z.object({
   anchorTime: z.string().optional(),
   // One-tap start, e.g. the break: anchor = now + minutes, then the calls run.
   start: z.object({ label: z.string(), sub: z.string().default(''), note: z.string().default(''), minutes: z.number().positive(), calls: z.array(vmixCall).default([]) }).optional(),
+  // One-tap end, e.g. back from the break: runs the calls; the run-down counts as over from then on.
+  end: z.object({ label: z.string(), sub: z.string().default(''), calls: z.array(vmixCall).default([]) }).optional(),
   steps: z.array(z.object({
     at: z.string(),
     label: z.string(),
@@ -31,7 +33,8 @@ const schedule = z.object({
     hero: z.string().optional(),
     durationSec: z.number().optional(),
     // auto: the server runs the calls by itself when the step is due (only while streaming and auto-run is on).
-    action: z.object({ label: z.string(), auto: z.boolean().default(false), calls: z.array(vmixCall) }).optional(),
+    // required: has no fixed time; it stays the next thing to do until the operator has triggered it.
+    action: z.object({ label: z.string(), auto: z.boolean().default(false), required: z.boolean().default(false), calls: z.array(vmixCall) }).optional(),
   })),
 });
 
@@ -58,12 +61,16 @@ const configSchema = z.object({
     autoHighlightTypes: z.array(z.string()).default([]),
     hideScoreboard: z.boolean().default(false),
     highlightMusic: z.string().default(''), // audio input played under the highlight reel
+    // Clips shown before and after the reel by the `highlightClip` step; the whole block is skipped without highlights.
+    highlightClip: z.object({ intro: z.array(z.string()).default([]), outro: z.array(z.string()).default([]) }).default({ intro: [], outro: [] }),
     defaultType: z.string(),
     types: z.array(z.string()).min(1),
     marks: z.array(z.object({ id: z.string(), label: z.string(), sub: z.string(), cams: z.array(z.string()).min(1) })).min(1),
   }),
   audio: z.object({
     sources: z.array(z.object({ id: z.string(), name: z.string(), short: z.string(), input: z.string(), role: z.enum(['commentary', 'atmo']).optional() })).min(1),
+    music: z.object({ name: z.string(), input: z.string() }).optional(), // background music with its own play/pause control
+    breakVideo: z.string().optional(), // break video whose sound can be swapped for the music
     loudnessTarget: z.number().default(-16),
     loudnessTolerance: z.number().default(3),
     loudnessOffset: z.number().default(0), // calibration of the estimate against a real loudness meter
@@ -78,7 +85,7 @@ const configSchema = z.object({
   logos: z.array(z.object({ name: z.string(), input: z.string(), overlay: z.number().int().min(1).max(8) })).default([]),
   preGame: z.object({
     streamLeadMinutes: z.number().positive().default(30),
-    muteOnStreamStart: z.boolean().default(false), // STREAM STARTEN mutes the audio sources first
+    onStreamStart: z.array(vmixCall).default([]), // run by STREAM STARTEN before the stream goes out
     recordGame: z.boolean().default(true), // default of the "record the game locally" switch
     reminder: z.string().default(''),
     emergency: z.object({ title: z.string(), text: z.string() }).optional(),
@@ -87,7 +94,7 @@ const configSchema = z.object({
       auto: z.enum(['cams', 'logos']).optional(), // ticked by the panel from vMix's state
       onlyIf: z.enum(['recordGame']).optional(), // only part of the list while that setting is on
     })).default([]),
-  }).default({ streamLeadMinutes: 30, muteOnStreamStart: false, recordGame: true, reminder: '', checklist: [] }),
+  }).default({ streamLeadMinutes: 30, onStreamStart: [], recordGame: true, reminder: '', checklist: [] }),
   controlling: z.array(z.object({
     label: z.string(),
     check: z.enum(['streamLead', 'onAir', 'logos', 'audio', 'stalls', 'noInterruption', 'videoExported', 'ticks']),

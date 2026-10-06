@@ -50,7 +50,7 @@
       "Tor"
     ],
     "hideScoreboard": true,
-    "highlightMusic": "Highlights - Music",
+    "highlightMusic": "Highlights - Sound*",
     "defaultType": "Szene",
     "types": [
       "Tor",
@@ -85,7 +85,17 @@
           "R"
         ]
       }
-    ]
+    ],
+    "highlightClip": {
+      "intro": [
+        "Only Women 4k v1.mp4",
+        "Intro_Floori_1080p.mp4"
+      ],
+      "outro": [
+        "Intro_Floori_1080p.mp4",
+        "Only Women 4k v1.mp4"
+      ]
+    }
   },
   "audio": {
     "sources": [
@@ -104,6 +114,11 @@
         "role": "atmo"
       }
     ],
+    "music": {
+      "name": "Musik",
+      "input": "General Music*"
+    },
+    "breakVideo": "Pausenvideo_FBRiders_Loop_5min.mp4",
     "loudnessTarget": -16,
     "loudnessTolerance": 3,
     "loudnessOffset": 0,
@@ -134,12 +149,15 @@
         {
           "at": "-30:00",
           "label": "Stream-Start in vMix",
-          "sub": "Mikrofone stumm, Bild und Ton im Hub-Admin prüfen",
+          "sub": "Mikrofone stumm, Liga-Logos an, Bild und Ton im Hub-Admin prüfen",
           "action": {
-            "label": "TON STUMM",
+            "label": "TON STUMM · LOGOS AN",
             "calls": [
               {
                 "panel": "audioPause"
+              },
+              {
+                "panel": "logosOn"
               }
             ]
           }
@@ -147,18 +165,35 @@
         {
           "at": "-15:00",
           "label": "Hub schaltet live",
-          "sub": "Opener auf Beauty Shot, Werbeslot 1",
-          "tag": "auto"
+          "sub": "Opener auf Beauty Shot, Werbeslot 1, Musik an",
+          "action": {
+            "label": "MUSIK AN",
+            "auto": true,
+            "calls": [
+              {
+                "Function": "AudioOn",
+                "Input": "General Music*"
+              },
+              {
+                "Function": "Play",
+                "Input": "General Music*"
+              }
+            ]
+          }
         },
         {
           "at": "-08:00",
           "label": "Liga-Trailer, Kommentar startet",
-          "sub": "muss im Stream sichtbar sein, Kommentar-Ton an",
+          "sub": "muss im Stream sichtbar sein, Musik aus, Kommentar-Ton an",
           "hero": "Liga-Trailer, dann Kommentar live",
           "action": {
             "label": "TRAILER STARTEN",
             "auto": true,
             "calls": [
+              {
+                "Function": "Pause",
+                "Input": "General Music*"
+              },
               {
                 "Function": "Restart",
                 "Input": "Intro L-UPL.mp4"
@@ -228,11 +263,11 @@
         {
           "at": "-00:22",
           "label": "Mobiliar-Clip",
-          "sub": "Ende spätestens 10 s vor Bully, Ton auf SPIEL",
+          "sub": "von Hand kurz vor dem Bully; danach automatisch Kamera M mit Ton",
           "durationSec": 12,
           "action": {
             "label": "MOBILIAR-CLIP",
-            "auto": true,
+            "required": true,
             "calls": [
               {
                 "Function": "Restart",
@@ -248,6 +283,16 @@
               },
               {
                 "panel": "audioGame"
+              },
+              {
+                "wait": 10200
+              },
+              {
+                "Function": "CutDirect",
+                "Input": "Haupt"
+              },
+              {
+                "panel": "logosOn"
               }
             ]
           }
@@ -255,17 +300,7 @@
         {
           "at": "-00:10",
           "label": "Anspiel: Live-Bild",
-          "sub": "Kamera M Totale",
-          "action": {
-            "label": "CAM M LIVE",
-            "auto": true,
-            "calls": [
-              {
-                "Function": "CutDirect",
-                "Input": "Haupt"
-              }
-            ]
-          }
+          "sub": "Kamera M Totale, folgt automatisch auf den Mobiliar-Clip"
         },
         {
           "at": "00:00",
@@ -280,15 +315,77 @@
       "anchorLabel": "WIEDERANPFIFF",
       "start": {
         "label": "PAUSE STARTEN",
-        "sub": "Ton aus · Highlight-Clip",
-        "note": "Lidl-Clip + Anspiel laufen danach automatisch vor dem Bully",
+        "sub": "Ton aus · Highlight-Clip · Pausenvideo im Loop",
+        "note": "Zurück mit dem Knopf ZURÜCK ZUM SPIEL",
         "minutes": 10,
         "calls": [
           {
             "panel": "audioPause"
           },
           {
-            "panel": "playHighlights"
+            "panel": "highlightClip"
+          },
+          {
+            "Function": "LoopOn",
+            "Input": "Pausenvideo_FBRiders_Loop_5min.mp4"
+          },
+          {
+            "Function": "Restart",
+            "Input": "Pausenvideo_FBRiders_Loop_5min.mp4"
+          },
+          {
+            "Function": "CutDirect",
+            "Input": "Pausenvideo_FBRiders_Loop_5min.mp4"
+          },
+          {
+            "Function": "Play",
+            "Input": "Pausenvideo_FBRiders_Loop_5min.mp4"
+          },
+          {
+            "panel": "breakSound"
+          }
+        ]
+      },
+      "end": {
+        "label": "ZURÜCK ZUM SPIEL",
+        "sub": "Lidl-Clip, dann Live-Bild mit Ton",
+        "calls": [
+          {
+            "Function": "Restart",
+            "Input": "Presenter - Lidl Schweiz Partner Unihockey Women v2.mp4"
+          },
+          {
+            "Function": "CutDirect",
+            "Input": "Presenter - Lidl Schweiz Partner Unihockey Women v2.mp4"
+          },
+          {
+            "Function": "Play",
+            "Input": "Presenter - Lidl Schweiz Partner Unihockey Women v2.mp4"
+          },
+          {
+            "wait": 6200
+          },
+          {
+            "Function": "CutDirect",
+            "Input": "Haupt"
+          },
+          {
+            "panel": "audioGame"
+          },
+          {
+            "Function": "Pause",
+            "Input": "Pausenvideo_FBRiders_Loop_5min.mp4"
+          },
+          {
+            "Function": "AudioOff",
+            "Input": "Pausenvideo_FBRiders_Loop_5min.mp4"
+          },
+          {
+            "panel": "logosOn"
+          },
+          {
+            "Function": "Pause",
+            "Input": "General Music*"
           }
         ]
       },
@@ -296,60 +393,32 @@
         {
           "at": "-10:00",
           "label": "Pausenbeginn",
-          "sub": "Resultat, Highlight-Clip, Werbeslot"
+          "sub": "Mikrofone stumm, Liga- und Riders-Intro, Highlight-Clip, Outro"
         },
         {
-          "at": "-00:22",
-          "label": "Lidl-Clip",
-          "sub": "Ende spätestens 10 s vor Bully",
-          "durationSec": 12,
-          "action": {
-            "label": "LIDL-CLIP",
-            "auto": true,
-            "calls": [
-              {
-                "Function": "Restart",
-                "Input": "Presenter - Lidl Schweiz Partner Unihockey Women v2.mp4"
-              },
-              {
-                "Function": "CutDirect",
-                "Input": "Presenter - Lidl Schweiz Partner Unihockey Women v2.mp4"
-              },
-              {
-                "Function": "Play",
-                "Input": "Presenter - Lidl Schweiz Partner Unihockey Women v2.mp4"
-              }
-            ]
-          }
-        },
-        {
-          "at": "-00:10",
-          "label": "Anspiel: Live-Bild",
-          "sub": "Kamera M Totale, Ton auf SPIEL",
-          "action": {
-            "label": "CAM M LIVE",
-            "auto": true,
-            "calls": [
-              {
-                "Function": "CutDirect",
-                "Input": "Haupt"
-              },
-              {
-                "panel": "audioGame"
-              }
-            ]
-          }
+          "at": "-08:00",
+          "label": "Pausenvideo",
+          "sub": "läuft im Loop bis zum Knopf, mit eigenem Ton oder Musik"
         },
         {
           "at": "00:00",
-          "label": "Anspiel"
+          "label": "Zurück zum Spiel",
+          "sub": "Knopf: Lidl-Clip, dann Kamera M mit Ton",
+          "tag": "Knopf"
         }
       ]
     }
   ],
   "preGame": {
     "streamLeadMinutes": 30,
-    "muteOnStreamStart": true,
+    "onStreamStart": [
+      {
+        "panel": "audioPause"
+      },
+      {
+        "panel": "logosOn"
+      }
+    ],
     "recordGame": true,
     "reminder": "Letztes Mal ging der Stream erst 4 Min vor Spielbeginn live. Dadurch fehlten Vorlauf und Liga-Trailer.",
     "emergency": {
@@ -527,36 +596,18 @@
       },
       {
         "id": "stop",
-        "title": "Liga-Trailer Short, Stopp"
+        "title": "Outro, Stopp"
       }
     ],
     "finish": {
       "label": "ABSCHLUSS STARTEN",
-      "sub": "Highlight-Clip · Liga-Trailer Short · Stream-Stopp",
+      "sub": "Liga- und Riders-Intro · Highlight-Clip · Outro · Stream-Stopp",
       "calls": [
         {
           "panel": "audioPause"
         },
         {
-          "panel": "playHighlights"
-        },
-        {
-          "panel": "waitPlayback"
-        },
-        {
-          "Function": "Restart",
-          "Input": "Highlights - Intros - Only Women 4k v1.mp4"
-        },
-        {
-          "Function": "CutDirect",
-          "Input": "Highlights - Intros - Only Women 4k v1.mp4"
-        },
-        {
-          "Function": "Play",
-          "Input": "Highlights - Intros - Only Women 4k v1.mp4"
-        },
-        {
-          "wait": 5000
+          "panel": "highlightClip"
         },
         {
           "panel": "stopAll"
@@ -586,8 +637,12 @@
       ],
       "template": [
         {
-          "title": "Highlight-Intro",
-          "input": "Highlights - Intros - Only Women 4k v1.mp4"
+          "title": "Liga-Intro",
+          "input": "Only Women 4k v1.mp4"
+        },
+        {
+          "title": "Riders-Intro",
+          "input": "Intro_Floori_1080p.mp4"
         },
         {
           "title": "Mobiliar-Clip",
@@ -603,8 +658,12 @@
           "required": true
         },
         {
-          "title": "Liga-Trailer kurz",
-          "input": "Highlights - Intros - Only Women 4k v1.mp4"
+          "title": "Riders-Outro",
+          "input": "Intro_Floori_1080p.mp4"
+        },
+        {
+          "title": "Liga-Outro",
+          "input": "Only Women 4k v1.mp4"
         }
       ]
     }

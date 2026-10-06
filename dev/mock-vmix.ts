@@ -12,6 +12,7 @@ const inputs: MockInput[] = [
   { title: 'Scoreboard', type: 'GT', text: { 'ScoreHome.Text': '2', 'ScoreAway.Text': '1', 'Period.Text': '2. Drittel', 'Clock.Text': '08:34', 'HomeName.Text': 'FB Riders', 'AwayName.Text': 'Gast' } },
   { title: 'Sponsor', type: 'Image' },
   { title: 'League ID', type: 'Image' },
+  { title: 'LUPL-SU_league_id.gtzip', type: 'GT' },
   { title: 'Livestream Pro', type: 'Image' },
   { title: 'Liga-Trailer', type: 'Video', duration: 60000 },
   { title: 'Liga-Trailer Short', type: 'Video', duration: 10000 },
@@ -19,7 +20,14 @@ const inputs: MockInput[] = [
   { title: 'Lidl-Clip', type: 'Video', duration: 12000 },
   { title: 'Mischpult', type: 'Audio', audio: 0.12 },
   { title: 'Highlights - Music', type: 'AudioFile' },
-  { title: 'Intro L-UPL.mp4', type: 'Video', duration: 5000 },
+  { title: 'Intro L-UPL.mp4', type: 'Video', duration: 27072 },
+  { title: 'Only Women 4k v1.mp4', type: 'Video', duration: 4032 },
+  { title: 'Intro_Floori_1080p.mp4', type: 'Video', duration: 8000 },
+  { title: 'Pausenvideo_FBRiders_Loop_5min.mp4', type: 'Video', duration: 300000 },
+  { title: 'Presenter - Lidl Schweiz Partner Unihockey Women v2.mp4', type: 'Video', duration: 6000 },
+  { title: 'mob_jubel_web_D.mp4', type: 'Video', duration: 10000 },
+  { title: 'General Music - 4. Never Be The Same.wav', type: 'VideoList', duration: 227894 },
+  { title: 'Highlights - Sound - Ice and Flames.wav', type: 'AudioFile' },
   { title: 'Haupt', type: 'Capture', audio: 0.04 },
 ].map((i, n) => ({ ...i, number: n + 1, key: `00000000-0000-0000-0000-${String(n + 1).padStart(12, '0')}` }));
 
@@ -61,6 +69,7 @@ function exec(fn: string, q: URLSearchParams): boolean {
     if (fn === 'Play') playingClips.add(inp.number);
   }
   else if (fn === 'AudioOn' || fn === 'AudioOff') { if (!inp) return false; inp.muted = fn === 'AudioOff'; }
+  else if (fn === 'LoopOn') { if (!inp) return false; }
   else if (fn === 'PreviewInput') { if (!inp) return false; s.preview = inp.number; }
   else if (fn === 'Cut' || fn === 'Fade') [s.active, s.preview] = [s.preview, s.active];
   else if (fn === 'ReplayMarkInOutLive') s.events++;

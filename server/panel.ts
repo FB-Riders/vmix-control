@@ -22,6 +22,7 @@ interface ScheduleStore {
   id: string;
   anchors: Record<string, number>; // zero point per run-down, epoch ms
   rounds: Record<string, number>; // how often each run-down was started today
+  running?: Record<string, boolean>; // started with its one-tap start and not ended yet
 }
 
 interface Persisted {
@@ -32,12 +33,18 @@ interface Persisted {
   ticks?: Record<string, boolean>;
   log?: MatchLog;
   recordGame?: boolean;
+  breakMusic?: boolean;
 }
 
 type Handlers = { [K in ActionName]: (input: ActionInput<K>) => Promise<ActionResult<K>> };
 type Snapshot = Omit<PanelState, 'now'>;
 
 const AUTO_WINDOW_MS = 4000; // an automatic step that is later than this is skipped, not caught up
+// Test run: holds configured in a step are cut to this (long enough for the 10 s sponsor clip) ...
+const SIM_MAX_HOLD_MS = 10_500;
+// ... clips up to this length play in full, longer ones only this long.
+const SIM_FULL_CLIP_SEC = 45;
+const SIM_LONG_CLIP_SEC = 10;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const today = () => new Date().toDateString();
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -81,7 +88,9 @@ export class Panel {
   private schedule: ScheduleStore;
   private autoRun = true;
   private recordGame: boolean; // record the game locally when the stream is started
+  private breakMusic: boolean; // break video muted, background music over it
   private fired = new Set<string>(); // automatic steps already handled
+  private triggered = new Set<string>(); // steps whose action has run, by hand or automatically
   private sim: (SimState & { schedule: string }) | null = null;
   private ticks: Record<string, boolean> = {};
   private video = { status: 'idle' as VideoState['status'], step: 0, speed: 100 };
@@ -106,6 +115,7 @@ export class Panel {
     this.schedule = s?.anchors && cfg.schedules.some((x) => x.id === s.id) ? s : { id: cfg.schedules[0].id, anchors: {}, rounds: {} };
     if (sameDay) this.ticks = saved.ticks ?? {};
     this.recordGame = saved.recordGame ?? cfg.preGame.recordGame;
+    this.breakMusic = saved.breakMusic ?? false;
     this.monitor = new Monitor(cfg, saved.log);
     this.video.speed = cfg.postGame.highlightVideo?.speeds.at(-1) ?? 100;
   }
@@ -180,7 +190,10 @@ export class Panel {
       if (!step.action?.auto || now < due || this.fired.has(key)) return;
       this.fired.add(key);
       const { action } = step;
-      if (this.autoRun && this.vm?.streaming && now - due < AUTO_WINDOW_MS) this.background(step.label, () => this.run(action.calls));
+      if (this.autoRun && this.vm?.streaming && now - due < AUTO_WINDOW_MS) {
+        this.triggered.add(this.stepKey(sc.id, i));
+        this.background(step.label, () => this.run(action.calls));
+      }
     });
   }
 
@@ -198,6 +211,8 @@ export class Panel {
   private findInput(ref: string | number | undefined): VmixInput | null {
     if (!this.vm || ref === undefined || ref === '') return null;
     const inputs = this.vm.inputs;
+    // "Name*" matches by prefix: a list input carries its current item in the title ("General Music - 4. Song.wav").
+    if (typeof ref === 'string' && ref.endsWith('*')) return inputs.find((i) => i.title.startsWith(ref.slice(0, -1))) ?? null;
     // vMix renames a disconnected device to "Offline - <name>"; it is still the same input.
     return inputs.find((i) => i.title === ref) ?? inputs.find((i) => i.title === `Offline - ${ref}`) ?? inputs.find((i) => i.key === ref)
       ?? (/^\d+$/.test(String(ref)) ? inputs.find((i) => i.number === Number(ref)) : undefined) ?? null;
@@ -242,6 +257,15 @@ export class Panel {
     });
   }
 
+  private musicState() {
+    const m = this.cfg.audio?.music;
+    if (!m) return null;
+    const inp = this.findInput(m.input);
+    // A list input is titled "<list> - <current item>"; show the item.
+    const track = inp ? inp.title.replace(/^.*? - /, '').replace(/\.\w+$/, '') : '';
+    return { name: m.name, track, playing: !!inp && inp.state === 'Running' && !inp.muted };
+  }
+
   private logoStates() {
     return this.cfg.logos.map((l) => {
       const inp = this.findInput(l.input);
@@ -263,13 +287,18 @@ export class Panel {
     cfg.cams.forEach((c) => need(c.input, `CAM ${c.id}`));
     need(cfg.scoreboard?.input, 'Scoreboard');
     cfg.audio?.sources.forEach((s) => need(s.input, `Ton ${s.short}`));
+    need(cfg.audio?.music?.input, 'Musik');
+    need(cfg.audio?.breakVideo, 'Pausenvideo');
     cfg.sponsor?.inputs.forEach((i) => need(i, 'Sponsor'));
     cfg.logos.forEach((l) => need(l.input, l.name));
+    [...cfg.replay.highlightClip.intro, ...cfg.replay.highlightClip.outro].forEach((i) => need(i, 'Highlight-Clip'));
     need(cfg.replay.highlightMusic, 'Highlight-Musik');
     for (const s of cfg.schedules) {
       if (s.start) needCalls(s.start.calls, s.start.label);
+      if (s.end) needCalls(s.end.calls, s.end.label);
       for (const step of s.steps) if (step.action) needCalls(step.action.calls, step.label);
     }
+    needCalls(cfg.preGame.onStreamStart, 'Stream-Start');
     if (cfg.postGame.finish) needCalls(cfg.postGame.finish.calls, cfg.postGame.finish.label);
     cfg.postGame.highlightVideo?.template.forEach((t) => { if ('input' in t) need(t.input, 'Highlight-Video'); });
     cfg.controlling.forEach((c) => need(c.input, 'Controlling'));
@@ -348,17 +377,22 @@ export class Panel {
     };
   }
 
+  private stepKey(id: string, i: number): string { return `${id}:${this.anchor(id)}:${i}`; }
+
   private scheduleView(sc: Config['schedules'][number]): ScheduleState {
     const { cfg } = this;
     return {
       id: sc.id, title: sc.title, anchorLabel: sc.anchorLabel, anchor: this.anchor(sc.id),
-      steps: sc.steps.map((s) => ({
-        offset: offsetSec(s.at), label: s.label, sub: s.sub, tag: s.tag || (s.action?.auto ? 'auto' : ''), auto: !!s.action?.auto,
+      steps: sc.steps.map((s, i) => ({
+        offset: offsetSec(s.at), label: s.label, sub: s.sub, tag: s.tag || (s.action?.auto ? 'auto' : s.action?.required ? 'Knopf' : ''), auto: !!s.action?.auto,
+        pending: !!s.action?.required && !this.triggered.has(this.stepKey(sc.id, i)),
         hero: s.hero ?? s.label, durationSec: s.durationSec ?? 0, action: s.action?.label ?? null,
       })),
       all: cfg.schedules.map(({ id, title, anchorLabel }) => ({ id, title, anchorLabel })),
       starts: cfg.schedules.flatMap((x) => (x.start ? [{ id: x.id, label: x.start.label, sub: x.start.sub, note: x.start.note }] : [])),
       start: sc.start ? { label: sc.start.label, sub: sc.start.sub, note: sc.start.note, minutes: sc.start.minutes } : null,
+      end: sc.end ? { label: sc.end.label, sub: sc.end.sub } : null,
+      running: !!this.schedule.running?.[sc.id],
       autoRun: this.autoRun,
       sim: this.sim?.schedule === sc.id ? { running: this.sim.running, step: this.sim.step, results: this.sim.results } : null,
     };
@@ -403,6 +437,8 @@ export class Panel {
       audio: sources.length
         ? { sources, preset: sources.every((s) => s.on) ? 'game' : sources.every((s) => !s.on) ? 'pause' : null }
         : null,
+      music: this.musicState(),
+      breakSound: cfg.audio?.music && cfg.audio.breakVideo ? { music: this.breakMusic } : null,
       sponsor: cfg.sponsor?.inputs.length
         ? { enabled: this.sponsor.enabled, nextAt: this.sponsor.nextAt, activeUntil: this.sponsor.activeUntil, intervalSec: cfg.sponsor.intervalSec, durationSec: cfg.sponsor.durationSec }
         : null,
@@ -456,7 +492,7 @@ export class Panel {
   }
 
   private persist(): void {
-    const data: Persisted = { day: today(), replays: this.replays, nextId: this.nextId, schedule: this.schedule, ticks: this.ticks, log: this.monitor.log, recordGame: this.recordGame };
+    const data: Persisted = { day: today(), replays: this.replays, nextId: this.nextId, schedule: this.schedule, ticks: this.ticks, log: this.monitor.log, recordGame: this.recordGame, breakMusic: this.breakMusic };
     this.monitor.dirty = false;
     this.lastSaved = Date.now();
     fs.mkdirSync(path.dirname(this.dataFile), { recursive: true });
@@ -484,6 +520,7 @@ export class Panel {
       try {
         if ('wait' in c) await sleep(Math.min(c.wait, maxWaitMs));
         else if ('panel' in c && c.panel === 'waitPlayback') await this.waitPlayback();
+        else if ('panel' in c && c.panel === 'highlightClip') await this.highlightClip();
         else await this.exclusive(() => this.step(c));
       } catch (e) {
         failure ??= e;
@@ -496,6 +533,8 @@ export class Panel {
     if (!('panel' in c)) { await this.vmix.call(c.Input !== undefined ? { ...c, Input: this.ref(c.Input) } : c); return; }
     if (c.panel === 'playHighlights') await this.playHighlights();
     else if (c.panel === 'audioGame' || c.panel === 'audioPause') await this.setAudio(c.panel === 'audioGame');
+    else if (c.panel === 'breakSound') await this.applyBreakSound();
+    else if (c.panel === 'logosOn' || c.panel === 'logosOff') await this.setLogos(c.panel === 'logosOn');
     else if (c.panel === 'startAll') await this.setOutputs(true);
     else if (c.panel === 'stopAll') await this.setOutputs(false);
   }
@@ -515,6 +554,22 @@ export class Panel {
       await this.vmix.call({ Function: on ? 'AudioOn' : 'AudioOff', Input: this.ref(s.input) }).catch((e) => { failure ??= e; });
     }
     if (failure) throw failure;
+  }
+
+  /** Sound under the break video: its own, or the background music with the video muted. */
+  private async applyBreakSound(): Promise<void> {
+    const a = this.cfg.audio;
+    if (!a?.music || !a.breakVideo) throw new PanelError('Pausenvideo oder Musik nicht konfiguriert');
+    const video = this.ref(a.breakVideo);
+    const music = this.ref(a.music.input);
+    if (this.breakMusic) {
+      await this.vmix.call({ Function: 'AudioOff', Input: video });
+      await this.vmix.call({ Function: 'AudioOn', Input: music });
+      await this.vmix.call({ Function: 'Play', Input: music });
+    } else {
+      await this.vmix.call({ Function: 'Pause', Input: music });
+      await this.vmix.call({ Function: 'AudioOn', Input: video });
+    }
   }
 
   private async setLogos(on: boolean): Promise<void> {
@@ -594,6 +649,27 @@ export class Panel {
     }
     if (!this.holdOverlays) await this.restoreOverlays();
     await this.ensureMainList();
+  }
+
+  /** Cuts to a clip, plays it from the start and waits until it is over. */
+  private async playClip(input: string): Promise<void> {
+    const ref = this.ref(input);
+    await this.exclusive(async () => {
+      for (const fn of ['Restart', 'CutDirect', 'Play']) await this.vmix.call({ Function: fn, Input: ref });
+    });
+    await sleep((this.findInput(input)?.duration ?? 0) + 200);
+  }
+
+  /**
+   * The highlight reel as shown on the stream: intro clips, the scenes, outro clips.
+   * Without highlights only the intro runs once; the outro (the same clips) would look like a repeat.
+   */
+  private async highlightClip(): Promise<void> {
+    const { intro, outro } = this.cfg.replay.highlightClip;
+    for (const clip of intro) await this.playClip(clip);
+    if (!(await this.exclusive(() => this.playHighlights()))) return;
+    await this.waitPlayback();
+    for (const clip of outro) await this.playClip(clip);
   }
 
   private async waitPlayback(maxMs = 10 * 60_000): Promise<void> {
@@ -684,17 +760,20 @@ export class Panel {
       sim.step = i;
       this.broadcast();
       // What the one-tap start does (e.g. PAUSE STARTEN) belongs to the first step.
-      const calls = [...(i === 0 ? sc.start?.calls ?? [] : []), ...(step.action?.calls ?? [])];
+      const last = i === steps.length - 1;
+      // ... and what the one-tap end does (e.g. back to the game) to the last one.
+      const calls = [...(i === 0 ? sc.start?.calls ?? [] : []), ...(step.action?.calls ?? []), ...(last ? sc.end?.calls ?? [] : [])];
       let error = '';
-      if (calls.length) await this.run(calls, 5000).catch((e) => { error = errorText(e); }); // configured holds are cut to 5 s
-      if (calls.some((c) => 'panel' in c && c.panel === 'playHighlights')) await this.waitPlayback(30_000);
+      if (calls.length) await this.run(calls, SIM_MAX_HOLD_MS).catch((e) => { error = errorText(e); });
       sim.results[i] = { ok: !error, text: error };
       if (i === steps.length - 1) break;
 
       const realGap = offsetSec(steps[i + 1].at) - offsetSec(step.at);
-      const clips = calls.map((c) => ('Input' in c ? (this.findInput(c.Input)?.duration ?? 0) / 1000 : 0));
-      // Only a clip that was started needs its running time; a step's own holds have already passed inside run().
-      const clipSec = Math.max(0, ...clips);
+      // Only a clip that was cut to program needs its running time (not background music); a step's own holds have
+      // already passed inside run(). Long clips such as the break video are only sampled.
+      const clips = calls.map((c) => ('Function' in c && c.Function === 'CutDirect' ? (this.findInput(c.Input)?.duration ?? 0) / 1000 : 0));
+      const longest = Math.max(0, ...clips);
+      const clipSec = longest > SIM_FULL_CLIP_SEC ? SIM_LONG_CLIP_SEC : longest;
       const waitSec = Math.min(Math.max(realGap, 3), Math.max(4, clipSec + 1.5));
       for (const end = Date.now() + waitSec * 1000; sim.running && Date.now() < end;) await sleep(250);
     }
@@ -784,6 +863,22 @@ export class Panel {
       await this.setAudio(on, id);
     },
 
+    music: async ({ play }) => {
+      const m = this.cfg.audio?.music;
+      if (!m) throw new PanelError('Keine Musik konfiguriert');
+      const input = this.ref(m.input);
+      if (play) await this.vmix.call({ Function: 'AudioOn', Input: input });
+      await this.vmix.call({ Function: play ? 'Play' : 'Pause', Input: input });
+    },
+
+    'break/sound': async ({ music }) => {
+      this.breakMusic = music;
+      this.persist();
+      // Applies right away only while the break video is the picture; otherwise it is the choice for the next break.
+      const video = this.findInput(this.cfg.audio?.breakVideo);
+      if (video && this.activeInput() === video) await this.applyBreakSound();
+    },
+
     'sponsor/now': async () => { await this.showSponsor(); },
 
     'sponsor/auto': async ({ enabled }) => {
@@ -801,8 +896,10 @@ export class Panel {
     },
 
     'stream/start': async () => {
-      // Mics closed before anything goes out; the run-down opens them again at the trailer.
-      if (this.cfg.preGame.muteOnStreamStart && this.cfg.audio) await this.setAudio(false).catch(() => {});
+      // E.g. mics closed and music on before anything goes out. A failing call must not keep the stream from starting.
+      for (const c of this.cfg.preGame.onStreamStart) {
+        if (!('wait' in c) && !('panel' in c && c.panel === 'waitPlayback')) await this.step(c).catch(() => {});
+      }
       await this.setOutputs(true);
     },
 
@@ -835,14 +932,26 @@ export class Panel {
       this.schedule.id = sc.id;
       this.schedule.anchors[sc.id] = Math.ceil((Date.now() + (minutes ?? start.minutes) * 60000) / 1000) * 1000;
       this.schedule.rounds[sc.id] = (this.schedule.rounds[sc.id] ?? 0) + 1;
+      this.schedule.running = { ...this.schedule.running, [sc.id]: true };
       this.persist();
       this.background(start.label, () => this.run(start.calls));
+    },
+
+    'schedule/end': async ({ id }) => {
+      const sc = this.cfg.schedules.find((s) => s.id === id);
+      const end = sc?.end;
+      if (!sc || !end) throw new PanelError(`Ablauf ${id} hat keinen Abschluss-Knopf`);
+      this.schedule.running = { ...this.schedule.running, [sc.id]: false };
+      this.schedule.anchors[sc.id] = Date.now();
+      this.persist();
+      this.background(end.label, () => this.run(end.calls));
     },
 
     'schedule/action': async ({ step, id }) => {
       const s = this.scheduleCfg(id).steps[step];
       const action = s?.action;
       if (!action) throw new PanelError('Schritt hat keine Aktion');
+      this.triggered.add(this.stepKey(this.scheduleCfg(id).id, step));
       this.background(s.label, () => this.run(action.calls));
     },
 
