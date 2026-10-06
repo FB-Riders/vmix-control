@@ -78,13 +78,16 @@ const configSchema = z.object({
   logos: z.array(z.object({ name: z.string(), input: z.string(), overlay: z.number().int().min(1).max(8) })).default([]),
   preGame: z.object({
     streamLeadMinutes: z.number().positive().default(30),
+    muteOnStreamStart: z.boolean().default(false), // STREAM STARTEN mutes the audio sources first
+    recordGame: z.boolean().default(true), // default of the "record the game locally" switch
     reminder: z.string().default(''),
     emergency: z.object({ title: z.string(), text: z.string() }).optional(),
     checklist: z.array(z.object({
       id: z.string(), title: z.string(), sub: z.string().default(''),
       auto: z.enum(['cams', 'logos']).optional(), // ticked by the panel from vMix's state
+      onlyIf: z.enum(['recordGame']).optional(), // only part of the list while that setting is on
     })).default([]),
-  }).default({ streamLeadMinutes: 30, reminder: '', checklist: [] }),
+  }).default({ streamLeadMinutes: 30, muteOnStreamStart: false, recordGame: true, reminder: '', checklist: [] }),
   controlling: z.array(z.object({
     label: z.string(),
     check: z.enum(['streamLead', 'onAir', 'logos', 'audio', 'stalls', 'noInterruption', 'videoExported', 'ticks']),

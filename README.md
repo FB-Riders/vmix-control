@@ -22,6 +22,8 @@ names in `config.json` that vMix does not know; the same warnings show at the bo
   - **Live**: cameras, replays, audio, run-down, controlling list. Keyboard: `F1–F3` live, `1–3` preview, `Q W E` mark
     replay, `A S D F` replay type, `G` sponsor, `H J` audio game / break. Shortcuts only work while the browser
     window has focus, not while you are working in vMix.
+  - **Pause**: choose the break length, PAUSE STARTEN, countdown to the bully, the break run-down, audio, highlights
+    and sponsors. The panel switches to this screen when the break is started and back to Live at the bully.
   - **Nach dem Spiel**: wrap-up steps, ABSCHLUSS (ends the stream), highlight video, interviews, full controlling list.
 
 ## What the panel checks by itself
@@ -46,6 +48,14 @@ Run-down steps with `"auto": true` are triggered by the panel at their time, as 
 AUTO is on (button above the run-down). A step that is more than 4 s late is skipped, never caught up. `−1 Min` /
 `+1 Min` move the whole run-down when the bully shifts. The ▶ next to a step triggers it by hand.
 
+## Test run (Probelauf)
+
+"▶ PROBELAUF" on the pre-game and break screens plays that run-down through in vMix without waiting for the clock
+(for the break including what PAUSE STARTEN does):
+every step is triggered in order, idle time between steps is cut to a few seconds, clips run in full. It really cuts
+and plays in vMix, so it only starts while no stream is running, and it stops if a stream starts. Each step shows ✓ or
+FEHLER with vMix's answer; ✓ means vMix accepted the commands, not that picture and sound were right.
+
 ## Highlight video
 
 vMix cannot render a file from a playlist through its API. "HIGHLIGHT-VIDEO AUFNEHMEN" therefore plays the template
@@ -69,7 +79,7 @@ ends up in vMix's recording folder. Clip lengths come from vMix, the scene lengt
 | `sponsor` | Inputs shown in rotation on the given overlay channel, every `intervalSec` for `durationSec`. |
 | `logos` | League logo inputs and their overlay channels. All of them must be on for LOGOS ● and the controlling. |
 | `schedules` | Run-downs. The first one is the pre-game run-down, its anchor is the kickoff. `at` is relative to the anchor (`-08:00` = 8 min before). An `action` is a list of calls (below), with `"auto": true` it runs by itself. A `start` block gives the run-down a one-tap start button (PAUSE STARTEN) that sets the anchor to now + `minutes` and runs its calls. |
-| `preGame` | `streamLeadMinutes`, the `reminder` text, the `emergency` card and the `checklist`. Checklist items with `auto` (`cams`, `logos`) are ticked by the panel. |
+| `preGame` | `streamLeadMinutes`, `muteOnStreamStart` (STREAM STARTEN mutes the audio sources first), `recordGame` (default of the "Spiel lokal aufnehmen" switch), the `reminder` text, the `emergency` card and the `checklist`. Checklist items with `auto` (`cams`, `logos`) are ticked by the panel. |
 | `controlling` | The controlling list. `check` is one of `streamLead`, `onAir` (input was on program; optionally in the n-th `round` of a `schedule`), `logos`, `audio`, `stalls`, `noInterruption`, `videoExported`, `ticks`. `post: true` shows the item only after the game. |
 | `postGame` | Wrap-up `steps`, the `finish` sequence (ABSCHLUSS), `interviews` and the `highlightVideo` template. |
 

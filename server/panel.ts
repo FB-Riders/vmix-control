@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { ActionInput, ActionName, ActionResult } from '../shared/actions';
-import type { ControllingItem, PanelState, Score, Tick, VideoState } from '../shared/state';
+import type { ControllingItem, PanelState, ScheduleState, Score, SimState, Tick, VideoState } from '../shared/state';
 import type { Config, VmixCall } from './config';
 import { emptyLog, type MatchLog, Monitor, type MonitorContext } from './monitor';
 import { type VmixClient, VmixError, type VmixInput, type VmixState } from './vmix';
@@ -31,6 +31,7 @@ interface Persisted {
   schedule?: ScheduleStore;
   ticks?: Record<string, boolean>;
   log?: MatchLog;
+  recordGame?: boolean;
 }
 
 type Handlers = { [K in ActionName]: (input: ActionInput<K>) => Promise<ActionResult<K>> };
@@ -79,7 +80,9 @@ export class Panel {
   private sponsor = { enabled: false, nextAt: 0, activeUntil: 0, rotation: 0 };
   private schedule: ScheduleStore;
   private autoRun = true;
+  private recordGame: boolean; // record the game locally when the stream is started
   private fired = new Set<string>(); // automatic steps already handled
+  private sim: (SimState & { schedule: string }) | null = null;
   private ticks: Record<string, boolean> = {};
   private video = { status: 'idle' as VideoState['status'], step: 0, speed: 100 };
   private notice: { text: string; until: number } | null = null; // a background sequence failed
@@ -102,6 +105,7 @@ export class Panel {
     const s = sameDay ? saved.schedule : undefined;
     this.schedule = s?.anchors && cfg.schedules.some((x) => x.id === s.id) ? s : { id: cfg.schedules[0].id, anchors: {}, rounds: {} };
     if (sameDay) this.ticks = saved.ticks ?? {};
+    this.recordGame = saved.recordGame ?? cfg.preGame.recordGame;
     this.monitor = new Monitor(cfg, saved.log);
     this.video.speed = cfg.postGame.highlightVideo?.speeds.at(-1) ?? 100;
   }
@@ -167,6 +171,7 @@ export class Panel {
   }
 
   private runDueSteps(now: number): void {
+    if (this.sim?.running) return; // the test run triggers the steps itself
     const sc = this.scheduleCfg();
     const anchor = this.anchor();
     sc.steps.forEach((step, i) => {
@@ -279,7 +284,7 @@ export class Panel {
   }
 
   private checklist(): Tick[] {
-    return this.cfg.preGame.checklist.map((c) => {
+    return this.cfg.preGame.checklist.filter((c) => c.onlyIf !== 'recordGame' || this.recordGame).map((c) => {
       const auto = c.auto === 'cams' ? this.cfg.cams.every((cam) => !!this.findInput(cam.input))
         : c.auto === 'logos' ? this.cfg.logos.length > 0 && this.logoStates().every((l) => l.visible)
         : undefined;
@@ -343,12 +348,29 @@ export class Panel {
     };
   }
 
+  private scheduleView(sc: Config['schedules'][number]): ScheduleState {
+    const { cfg } = this;
+    return {
+      id: sc.id, title: sc.title, anchorLabel: sc.anchorLabel, anchor: this.anchor(sc.id),
+      steps: sc.steps.map((s) => ({
+        offset: offsetSec(s.at), label: s.label, sub: s.sub, tag: s.tag || (s.action?.auto ? 'auto' : ''), auto: !!s.action?.auto,
+        hero: s.hero ?? s.label, durationSec: s.durationSec ?? 0, action: s.action?.label ?? null,
+      })),
+      all: cfg.schedules.map(({ id, title, anchorLabel }) => ({ id, title, anchorLabel })),
+      starts: cfg.schedules.flatMap((x) => (x.start ? [{ id: x.id, label: x.start.label, sub: x.start.sub, note: x.start.note }] : [])),
+      start: sc.start ? { label: sc.start.label, sub: sc.start.sub, note: sc.start.note, minutes: sc.start.minutes } : null,
+      autoRun: this.autoRun,
+      sim: this.sim?.schedule === sc.id ? { running: this.sim.running, step: this.sim.step, results: this.sim.results } : null,
+    };
+  }
+
   private snapshot(): Snapshot {
     const { cfg, vm } = this;
     const now = Date.now();
     const active = this.activeInput();
     const preview = vm?.inputs.find((i) => i.number === vm.preview);
     const sc = this.scheduleCfg();
+    const breakCfg = cfg.schedules.find((x) => x.start);
     const sources = this.audioSources();
     const logos = this.logoStates();
     const ctx = this.monitorContext(now);
@@ -402,6 +424,7 @@ export class Panel {
       pre: {
         kickoff,
         streamBy: kickoff - cfg.preGame.streamLeadMinutes * 60_000,
+        recordGame: this.recordGame,
         reminder: cfg.preGame.reminder,
         emergency: cfg.preGame.emergency ?? null,
         checklist: this.checklist(),
@@ -412,16 +435,9 @@ export class Panel {
         interviews: cfg.postGame.interviews.map((i) => this.tick(`iv:${i.id}`, i.title, i.sub)),
         video: this.videoState(),
       },
-      schedule: {
-        id: sc.id, title: sc.title, anchorLabel: sc.anchorLabel, anchor: this.anchor(),
-        steps: sc.steps.map((s) => ({
-          offset: offsetSec(s.at), label: s.label, sub: s.sub, tag: s.tag || (s.action?.auto ? 'auto' : ''), auto: !!s.action?.auto,
-          hero: s.hero ?? s.label, durationSec: s.durationSec ?? 0, action: s.action?.label ?? null,
-        })),
-        all: cfg.schedules.map(({ id, title, anchorLabel }) => ({ id, title, anchorLabel })),
-        starts: cfg.schedules.flatMap((s) => (s.start ? [{ id: s.id, label: s.start.label, sub: s.start.sub, note: s.start.note }] : [])),
-        autoRun: this.autoRun,
-      },
+      schedule: this.scheduleView(sc),
+      preRundown: this.scheduleView(cfg.schedules[0]),
+      breakRundown: breakCfg ? this.scheduleView(breakCfg) : null,
       warnings: this.warnings(),
     };
   }
@@ -440,7 +456,7 @@ export class Panel {
   }
 
   private persist(): void {
-    const data: Persisted = { day: today(), replays: this.replays, nextId: this.nextId, schedule: this.schedule, ticks: this.ticks, log: this.monitor.log };
+    const data: Persisted = { day: today(), replays: this.replays, nextId: this.nextId, schedule: this.schedule, ticks: this.ticks, log: this.monitor.log, recordGame: this.recordGame };
     this.monitor.dirty = false;
     this.lastSaved = Date.now();
     fs.mkdirSync(path.dirname(this.dataFile), { recursive: true });
@@ -462,11 +478,11 @@ export class Panel {
   }
 
   /** Runs a configured sequence. A failing call does not stop the rest (e.g. a missing clip must not keep the audio muted). */
-  private async run(calls: VmixCall[]): Promise<void> {
+  private async run(calls: VmixCall[], maxWaitMs = Infinity): Promise<void> {
     let failure: unknown;
     for (const c of calls) {
       try {
-        if ('wait' in c) await sleep(c.wait);
+        if ('wait' in c) await sleep(Math.min(c.wait, maxWaitMs));
         else if ('panel' in c && c.panel === 'waitPlayback') await this.waitPlayback();
         else await this.exclusive(() => this.step(c));
       } catch (e) {
@@ -484,17 +500,21 @@ export class Panel {
     else if (c.panel === 'stopAll') await this.setOutputs(false);
   }
 
-  /** Stream, local recording and replay recording together. */
+  /** Stream, replay recording and (if wanted) the local recording together. Stopping always stops a running recording. */
   private async setOutputs(on: boolean): Promise<void> {
     if (!!this.vm?.streaming !== on) await this.vmix.call({ Function: on ? 'StartStreaming' : 'StopStreaming' });
-    if (!!this.vm?.recording !== on) await this.vmix.call({ Function: on ? 'StartRecording' : 'StopRecording' });
+    if (!!this.vm?.recording !== on && (this.recordGame || !on)) await this.vmix.call({ Function: on ? 'StartRecording' : 'StopRecording' });
     if (this.replayRecording() !== on) await this.vmix.call({ Function: on ? 'ReplayStartRecording' : 'ReplayStopRecording' });
   }
 
   private async setAudio(on: boolean, only?: string): Promise<void> {
     const sources = (this.cfg.audio?.sources ?? []).filter((s) => !only || s.id === only);
     if (!sources.length) throw new PanelError('Keine Tonquelle konfiguriert');
-    for (const s of sources) await this.vmix.call({ Function: on ? 'AudioOn' : 'AudioOff', Input: this.ref(s.input) });
+    let failure: unknown; // one source that is offline must not keep the others from switching
+    for (const s of sources) {
+      await this.vmix.call({ Function: on ? 'AudioOn' : 'AudioOff', Input: this.ref(s.input) }).catch((e) => { failure ??= e; });
+    }
+    if (failure) throw failure;
   }
 
   private async setLogos(on: boolean): Promise<void> {
@@ -576,8 +596,8 @@ export class Panel {
     await this.ensureMainList();
   }
 
-  private async waitPlayback(): Promise<void> {
-    const giveUp = Date.now() + 10 * 60_000;
+  private async waitPlayback(maxMs = 10 * 60_000): Promise<void> {
+    const giveUp = Date.now() + maxMs;
     await sleep(600);
     while (this.playing && Date.now() < giveUp) await sleep(300);
   }
@@ -650,6 +670,37 @@ export class Panel {
         await this.restoreOverlays();
       }).catch(() => {});
     }
+  }
+
+  /**
+   * Test run of the pre-game run-down: every step is triggered in vMix one after the other, idle time between
+   * steps is cut short, clips get their full length. Only without a stream, so nothing of it goes out.
+   */
+  private async simulate(sim: SimState & { schedule: string }): Promise<void> {
+    const sc = this.scheduleCfg(sim.schedule);
+    const steps = sc.steps;
+    for (let i = 0; i < steps.length && sim.running && !this.vm?.streaming; i++) {
+      const step = steps[i];
+      sim.step = i;
+      this.broadcast();
+      // What the one-tap start does (e.g. PAUSE STARTEN) belongs to the first step.
+      const calls = [...(i === 0 ? sc.start?.calls ?? [] : []), ...(step.action?.calls ?? [])];
+      let error = '';
+      if (calls.length) await this.run(calls, 5000).catch((e) => { error = errorText(e); }); // configured holds are cut to 5 s
+      if (calls.some((c) => 'panel' in c && c.panel === 'playHighlights')) await this.waitPlayback(30_000);
+      sim.results[i] = { ok: !error, text: error };
+      if (i === steps.length - 1) break;
+
+      const realGap = offsetSec(steps[i + 1].at) - offsetSec(step.at);
+      const clips = calls.map((c) => ('Input' in c ? (this.findInput(c.Input)?.duration ?? 0) / 1000 : 0));
+      // Only a clip that was started needs its running time; a step's own holds have already passed inside run().
+      const clipSec = Math.max(0, ...clips);
+      const waitSec = Math.min(Math.max(realGap, 3), Math.max(4, clipSec + 1.5));
+      for (const end = Date.now() + waitSec * 1000; sim.running && Date.now() < end;) await sleep(250);
+    }
+    if (sim.running) sim.step = steps.length;
+    sim.running = false;
+    this.broadcast();
   }
 
   // ---------- actions ----------
@@ -749,7 +800,16 @@ export class Panel {
       else await this.setLogos(on);
     },
 
-    'stream/start': async () => { await this.setOutputs(true); },
+    'stream/start': async () => {
+      // Mics closed before anything goes out; the run-down opens them again at the trailer.
+      if (this.cfg.preGame.muteOnStreamStart && this.cfg.audio) await this.setAudio(false).catch(() => {});
+      await this.setOutputs(true);
+    },
+
+    'settings/record': async ({ enabled }) => {
+      this.recordGame = enabled;
+      this.persist();
+    },
 
     'schedule/set': async ({ id, time, inMinutes }) => {
       const sc = this.cfg.schedules.find((s) => s.id === (id ?? this.schedule.id));
@@ -760,26 +820,27 @@ export class Panel {
       this.persist();
     },
 
-    'schedule/shift': async ({ minutes }) => {
-      this.schedule.anchors[this.schedule.id] = this.anchor() + minutes * 60_000;
+    'schedule/shift': async ({ minutes, id }) => {
+      const sc = this.scheduleCfg(id);
+      this.schedule.anchors[sc.id] = this.anchor(sc.id) + minutes * 60_000;
       this.persist();
     },
 
     'schedule/auto': async ({ enabled }) => { this.autoRun = enabled; },
 
-    'schedule/start': async ({ id }) => {
+    'schedule/start': async ({ id, minutes }) => {
       const sc = this.cfg.schedules.find((s) => s.id === id);
       const start = sc?.start;
       if (!sc || !start) throw new PanelError(`Ablauf ${id} hat keinen Schnellstart`);
       this.schedule.id = sc.id;
-      this.schedule.anchors[sc.id] = Math.ceil((Date.now() + start.minutes * 60000) / 1000) * 1000;
+      this.schedule.anchors[sc.id] = Math.ceil((Date.now() + (minutes ?? start.minutes) * 60000) / 1000) * 1000;
       this.schedule.rounds[sc.id] = (this.schedule.rounds[sc.id] ?? 0) + 1;
       this.persist();
       this.background(start.label, () => this.run(start.calls));
     },
 
-    'schedule/action': async ({ step }) => {
-      const s = this.scheduleCfg().steps[step];
+    'schedule/action': async ({ step, id }) => {
+      const s = this.scheduleCfg(id).steps[step];
       const action = s?.action;
       if (!action) throw new PanelError('Schritt hat keine Aktion');
       this.background(s.label, () => this.run(action.calls));
@@ -799,6 +860,24 @@ export class Panel {
       if (this.vm?.streaming || this.vm?.recording) throw new PanelError('Erst Stream und Aufnahme beenden (Abschluss)');
       if (!this.highlights().length) throw new PanelError('Keine Highlights markiert');
       this.background('Highlight-Video', () => this.exportVideo());
+    },
+
+    'highlights/play': async () => {
+      if (!(await this.playHighlights())) throw new PanelError('Keine Highlights markiert');
+    },
+
+    'sim/start': async ({ schedule }) => {
+      if (this.vm?.streaming) throw new PanelError('Probelauf nur ohne laufenden Stream');
+      if (this.sim?.running) throw new PanelError('Probelauf läuft bereits');
+      const sim = { running: true, step: 0, results: [], schedule: this.scheduleCfg(schedule ?? this.cfg.schedules[0].id).id };
+      this.sim = sim;
+      this.background('Probelauf', () => this.simulate(sim));
+    },
+
+    // Stops a running test run; pressed again, clears its result.
+    'sim/stop': async () => {
+      if (this.sim?.running) this.sim.running = false;
+      else this.sim = null;
     },
 
     tick: async ({ id, done }) => {

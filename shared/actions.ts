@@ -22,16 +22,20 @@ export const actionSchemas = {
     time: z.string().regex(/^\d{1,2}:\d{2}$/).optional(),
     inMinutes: z.number().positive().max(600).optional(),
   }),
-  'schedule/start': z.object({ id: z.string() }),
-  'schedule/shift': z.object({ minutes: z.number().min(-30).max(30) }),
+  'schedule/start': z.object({ id: z.string(), minutes: z.number().positive().max(60).optional() }),
+  'schedule/shift': z.object({ minutes: z.number().min(-30).max(30), id: z.string().optional() }),
   'schedule/auto': z.object({ enabled: z.boolean() }),
   'stream/start': z.object({}),
+  'settings/record': z.object({ enabled: z.boolean() }),
   'post/finish': z.object({}),
   'video/speed': z.object({ speed: z.number().min(10).max(100) }),
   'video/export': z.object({}),
   tick: z.object({ id: z.string(), done: z.boolean() }),
   'match/reset': z.object({}),
-  'schedule/action': z.object({ step: z.number().int().nonnegative() }),
+  'sim/start': z.object({ schedule: z.string().optional() }),
+  'sim/stop': z.object({}),
+  'schedule/action': z.object({ step: z.number().int().nonnegative(), id: z.string().optional() }),
+  'highlights/play': z.object({}),
 } as const;
 
 export type ActionName = keyof typeof actionSchemas;

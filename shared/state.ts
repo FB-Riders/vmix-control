@@ -69,7 +69,16 @@ export interface ScheduleState {
   steps: ScheduleStep[];
   all: { id: string; title: string; anchorLabel: string }[];
   starts: { id: string; label: string; sub: string; note: string }[]; // run-downs that can be started with one tap, e.g. the break
+  start: { label: string; sub: string; note: string; minutes: number } | null; // this run-down's own one-tap start
   autoRun: boolean; // automatic steps are armed
+  sim: SimState | null; // test run of the pre-game run-down, or its result
+}
+
+/** Test run: a run-down's steps are played through in vMix in quick succession, without a stream. */
+export interface SimState {
+  running: boolean;
+  step: number; // step being processed; equals the number of steps once finished
+  results: { ok: boolean; text: string }[]; // per processed step; text is the vMix error if it failed
 }
 
 /** A manual tick: `id` is what the `tick` action takes. */
@@ -114,6 +123,7 @@ export interface VideoState {
 export interface PreGameState {
   kickoff: number; // epoch ms
   streamBy: number; // epoch ms, latest stream start
+  recordGame: boolean; // STREAM STARTEN also starts vMix's local recording
   reminder: string;
   emergency: { title: string; text: string } | null;
   checklist: Tick[];
@@ -143,6 +153,8 @@ export interface PanelState {
   controlling: ControllingItem[];
   pre: PreGameState;
   post: PostGameState;
-  schedule: ScheduleState;
+  schedule: ScheduleState; // the run-down that is active right now
+  preRundown: ScheduleState; // the run-down to the first bully
+  breakRundown: ScheduleState | null; // the break run-down, whether it is active or not
   warnings: string[];
 }

@@ -39,7 +39,7 @@
     ],
     "homeName": "TxtHomeName.Text",
     "awayName": "TxtAwayName.Text",
-    "overlay": 3
+    "overlay": 1
   },
   "replay": {
     "seconds": 4,
@@ -113,7 +113,7 @@
     "inputs": [
       "LUPL-SU_sponsor.gtzip"
     ],
-    "overlay": 2,
+    "overlay": 3,
     "intervalSec": 180,
     "durationSec": 10
   },
@@ -134,7 +134,15 @@
         {
           "at": "-30:00",
           "label": "Stream-Start in vMix",
-          "sub": "Bild und Ton im Hub-Admin prüfen"
+          "sub": "Mikrofone stumm, Bild und Ton im Hub-Admin prüfen",
+          "action": {
+            "label": "TON STUMM",
+            "calls": [
+              {
+                "panel": "audioPause"
+              }
+            ]
+          }
         },
         {
           "at": "-15:00",
@@ -145,7 +153,7 @@
         {
           "at": "-08:00",
           "label": "Liga-Trailer, Kommentar startet",
-          "sub": "muss im Stream sichtbar sein",
+          "sub": "muss im Stream sichtbar sein, Kommentar-Ton an",
           "hero": "Liga-Trailer, dann Kommentar live",
           "action": {
             "label": "TRAILER STARTEN",
@@ -162,6 +170,10 @@
               {
                 "Function": "Play",
                 "Input": "Intro L-UPL.mp4"
+              },
+              {
+                "Function": "AudioOn",
+                "Input": "Audio UR44C Input 1+2"
               }
             ]
           }
@@ -169,17 +181,44 @@
         {
           "at": "-07:00",
           "label": "Aufstellungen Gast, Heim",
-          "sub": "Kamera M",
+          "sub": "Kamera M mit Hallenton, Aufstellungen auf Overlay 2",
           "action": {
-            "label": "CAM M",
+            "label": "AUFSTELLUNGEN",
             "auto": true,
             "calls": [
               {
                 "Function": "CutDirect",
                 "Input": "Haupt"
+              },
+              {
+                "panel": "audioGame"
+              },
+              {
+                "Function": "OverlayInput2In",
+                "Input": "LUPL-SU_team_lineup_away.gtzip"
+              },
+              {
+                "wait": 40000
+              },
+              {
+                "Function": "OverlayInput2Out"
+              },
+              {
+                "wait": 3000
+              },
+              {
+                "Function": "OverlayInput2In",
+                "Input": "LUPL-SU_team_lineup_home.gtzip"
+              },
+              {
+                "wait": 40000
+              },
+              {
+                "Function": "OverlayInput2Out"
               }
             ]
-          }
+          },
+          "durationSec": 90
         },
         {
           "at": "-05:00",
@@ -310,6 +349,8 @@
   ],
   "preGame": {
     "streamLeadMinutes": 30,
+    "muteOnStreamStart": true,
+    "recordGame": true,
     "reminder": "Letztes Mal ging der Stream erst 4 Min vor Spielbeginn live. Dadurch fehlten Vorlauf und Liga-Trailer.",
     "emergency": {
       "title": "Notfall: Technik fällt aus",
@@ -386,7 +427,8 @@
       {
         "id": "rec",
         "title": "Lokales Recording eingestellt",
-        "sub": "H264, 8 Mbit, 50p"
+        "sub": "H264, 8 Mbit, 50p",
+        "onlyIf": "recordGame"
       }
     ]
   },

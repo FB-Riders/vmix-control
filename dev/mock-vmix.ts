@@ -19,6 +19,8 @@ const inputs: MockInput[] = [
   { title: 'Lidl-Clip', type: 'Video', duration: 12000 },
   { title: 'Mischpult', type: 'Audio', audio: 0.12 },
   { title: 'Highlights - Music', type: 'AudioFile' },
+  { title: 'Intro L-UPL.mp4', type: 'Video', duration: 5000 },
+  { title: 'Haupt', type: 'Capture', audio: 0.04 },
 ].map((i, n) => ({ ...i, number: n + 1, key: `00000000-0000-0000-0000-${String(n + 1).padStart(12, '0')}` }));
 
 const s = { active: 2, preview: 1, streaming: false, recording: false, replayRec: true, events: 0, overlays: [0, 0, 0, 0] };
