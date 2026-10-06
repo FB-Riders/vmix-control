@@ -68,10 +68,10 @@ export function ReplayList({ replay, visible, currentPeriod, desktop }: Props) {
                     key={cam}
                     variant="outline"
                     className={cn(
-                      control, 'border-2 p-0 font-black', desktop ? 'w-9 text-[15px]' : 'w-7 text-[13px]',
+                      control, 'border p-0 font-black', desktop ? 'w-9 text-[15px]' : 'w-7 text-[13px]',
                       on
-                        ? 'border-foreground bg-foreground text-background hover:bg-foreground hover:text-background'
-                        : 'border-dashed border-muted-foreground bg-background text-muted-foreground',
+                        ? 'border-muted-foreground bg-muted-foreground text-background hover:bg-muted-foreground hover:text-background'
+                        : 'border-dashed border-input bg-transparent text-dim',
                     )}
                     aria-label={`CAM ${cam} ${on ? 'aus Replay entfernen' : 'zum Replay hinzufügen'}`}
                     aria-pressed={on}
@@ -84,24 +84,25 @@ export function ReplayList({ replay, visible, currentPeriod, desktop }: Props) {
             </div>
             <Button
               variant="outline"
-              className={cn(control, 'shrink-0 border-2 border-foreground bg-background p-0', desktop ? 'w-11' : 'w-[34px]')}
+              className={cn(control, 'shrink-0 border border-input bg-transparent p-0', desktop ? 'w-11' : 'w-[34px]')}
               aria-label={`${r.type} von ${r.time} in der vMix-Preview ansehen`}
               onClick={() => act('replay/preview', { id: r.id })}
             >
               <EyeIcon />
             </Button>
             <Button
-              className={cn(control, 'shrink-0 border-2 p-0 font-black', desktop ? 'w-[68px] text-[13px]' : 'w-10 text-[11px]', r.playing ? 'border-background bg-background hover:bg-background' : 'border-primary')}
+              variant="outline"
+              className={cn(control, 'shrink-0 gap-1 border p-0 font-black', desktop ? 'w-[68px] text-[13px]' : 'w-10 text-[11px]', r.playing ? 'border-background bg-background hover:bg-background' : 'border-input bg-transparent')}
               aria-label={`${r.type} von ${r.time} mit Stinger abspielen`}
               onClick={() => act('replay/play', { id: r.id })}
             >
-              {r.playing ? 'ON AIR' : desktop ? '▶ PLAY' : '▶'}
+              {r.playing ? 'ON AIR' : <><span className="text-primary">▶</span>{desktop && 'PLAY'}</>}
             </Button>
             <Button
               variant="outline"
               className={cn(
                 control, 'shrink-0 border-2 p-0 text-[11px] font-black', desktop ? 'w-9' : 'w-7',
-                deleting === r.id ? 'border-foreground bg-foreground text-background hover:bg-foreground hover:text-background' : 'border-transparent bg-transparent text-muted-foreground',
+                deleting === r.id ? 'border-muted-foreground bg-muted-foreground text-background hover:bg-muted-foreground hover:text-background' : 'border-transparent bg-transparent text-muted-foreground',
               )}
               aria-label={deleting === r.id ? `${r.type} von ${r.time} wirklich löschen` : `${r.type} von ${r.time} löschen`}
               onClick={() => remove(r.id)}

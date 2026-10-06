@@ -23,9 +23,9 @@ export function AudioPresetButton({ audio, preset, desktop }: PresetProps) {
     <Button
       variant="outline"
       className={cn(
-        'flex-col gap-px border-2 border-muted-foreground bg-background font-black',
+        'flex-col gap-px border-2 border-secondary bg-secondary font-black',
         desktop ? 'h-14 text-[15px] tracking-widest' : 'h-12 text-xs',
-        active && game && 'border-foreground bg-foreground text-background hover:bg-foreground hover:text-background',
+        active && game && 'border-muted-foreground bg-muted-foreground text-background hover:bg-muted-foreground hover:text-background',
         active && !game && 'border-primary bg-primary hover:bg-primary',
       )}
       aria-label={`Ton ${game ? 'Spiel' : 'Pause'}: ${sub}`}
@@ -50,7 +50,7 @@ export function AudioSources({ audio }: { audio: AudioState }) {
             variant="outline"
             className={cn(
               'h-11 w-[88px] shrink-0 border-2 text-[13px] font-black',
-              s.on ? 'border-foreground bg-foreground text-background hover:bg-foreground hover:text-background' : 'border-primary bg-primary hover:bg-primary',
+              s.on ? 'border-muted-foreground bg-muted-foreground text-background hover:bg-muted-foreground hover:text-background' : 'border-primary bg-primary hover:bg-primary',
             )}
             aria-label={`${s.name} ${s.on ? 'stummschalten' : 'einschalten'}`}
             aria-pressed={s.on}
@@ -61,7 +61,7 @@ export function AudioSources({ audio }: { audio: AudioState }) {
           <div className="flex min-w-0 grow flex-col gap-1.5">
             <span className="text-[13px] font-medium">{s.name}</span>
             <div className="h-2 rounded-sm bg-card" role="meter" aria-label={`Pegel ${s.name}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(s.level * 100)}>
-              <div className="h-2 rounded-sm bg-foreground transition-[width] duration-300" style={{ width: `${s.level * 100}%` }} />
+              <div className="h-2 rounded-sm bg-muted-foreground transition-[width] duration-300" style={{ width: `${s.level * 100}%` }} />
             </div>
           </div>
         </div>

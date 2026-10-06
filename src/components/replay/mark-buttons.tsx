@@ -21,7 +21,7 @@ export function MarkButtons({ replay, marking, recording, desktop }: Props) {
     return (
       <Button
         variant="outline"
-        className={cn(height, 'flex-col gap-0.5 border-2 border-primary bg-background font-black whitespace-normal', desktop ? 'text-xl' : 'text-[15px]')}
+        className={cn(height, 'flex-col gap-0.5 border-2 border-secondary border-b-primary bg-secondary font-black whitespace-normal', desktop ? 'text-xl' : 'text-[15px]')}
         onClick={() => act('toggle', { what: 'replayRec', on: true })}
       >
         ▶ REPLAY-AUFNAHME STARTEN
@@ -36,7 +36,7 @@ export function MarkButtons({ replay, marking, recording, desktop }: Props) {
         {replay.types.map((t, i) => (
           <Button
             key={t}
-            variant={i === 0 ? 'default' : 'secondary'}
+            variant="secondary"
             className={cn(height, 'flex-col gap-0.5 font-black text-foreground', desktop ? 'text-lg' : 'text-[15px]')}
             onClick={() => marking.pickType(t)}
           >
@@ -54,7 +54,7 @@ export function MarkButtons({ replay, marking, recording, desktop }: Props) {
         <Button
           key={m.id}
           variant="outline"
-          className={cn(height, 'flex-col gap-0.5 border-2 border-primary bg-background font-black', desktop ? 'text-[22px]' : 'text-[17px] tracking-wide')}
+          className={cn(height, 'flex-col gap-0.5 border-2 border-secondary border-b-primary bg-secondary font-black', desktop ? 'text-[22px]' : 'text-[17px] tracking-wide')}
           aria-label={`Replay markieren: ${m.sub}`}
           onClick={() => marking.mark(m.id)}
         >

@@ -41,10 +41,10 @@ export function PreviewRow({ cams, desktop }: Props) {
           variant="outline"
           disabled={c.program}
           className={cn(
-            'flex-col gap-px border-2 border-muted-foreground bg-background font-black text-muted-foreground',
+            'flex-col gap-px border-2 border-secondary bg-secondary font-black text-muted-foreground',
             desktop ? 'h-14 text-lg' : 'h-12 text-xl',
-            c.preview && !c.program && 'border-foreground bg-foreground text-background hover:bg-foreground hover:text-background',
-            c.program && 'border-border text-input disabled:opacity-100',
+            c.preview && !c.program && 'border-muted-foreground bg-muted-foreground text-background hover:bg-muted-foreground hover:text-background',
+            c.program && 'border-border bg-background text-input disabled:opacity-100',
           )}
           aria-label={`CAM ${c.id} in Preview`}
           aria-pressed={c.preview}

@@ -51,9 +51,9 @@
   --accent-foreground: #FFFFFF;
   --destructive: #CD1619;
   --border: #292929;
-  --input: #5A5A5A;
+  --input: rgb(227 227 227 / 0.28); /* Light Grey, faint: outlines and inactive dots */
   --ring: #FFFFFF;
-  --dim: #8A8A8A;
+  --dim: rgb(227 227 227 / 0.55); /* Light Grey, dimmed: inactive text */
   --radius: 0.25rem;
   color-scheme: dark;
 }

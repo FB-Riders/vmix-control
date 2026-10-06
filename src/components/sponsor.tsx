@@ -18,7 +18,7 @@ export function SponsorButton({ sponsor }: { sponsor: SponsorState }) {
   return (
     <Button
       variant="outline"
-      className="h-12 flex-col gap-px border-2 border-muted-foreground bg-background text-xs font-black"
+      className="h-12 flex-col gap-px border-2 border-secondary bg-secondary text-xs font-black"
       aria-label="Sponsor-Einblender jetzt zeigen"
       onClick={() => act('sponsor/now')}
     >
@@ -36,7 +36,7 @@ export function SponsorRow({ sponsor }: { sponsor: SponsorState }) {
     <div className="flex items-center gap-3">
       <Button
         variant="outline"
-        className="h-11 w-[88px] shrink-0 border-2 border-foreground bg-background text-[13px] font-black"
+        className="h-11 w-[88px] shrink-0 border-2 border-secondary bg-secondary text-[13px] font-black"
         onClick={() => act('sponsor/now')}
       >
         JETZT
