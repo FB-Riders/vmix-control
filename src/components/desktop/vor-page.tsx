@@ -3,20 +3,21 @@ import type { PanelState } from '@shared/state';
 import { ScheduleDialog } from '@/components/ablauf/schedule-dialog';
 import { Caption } from '@/components/caption';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { useNow } from '@/hooks/use-now';
 import { act } from '@/lib/api';
-import { hhmm, hhmmss, mmss } from '@/lib/time';
+import { hhmm, mmss } from '@/lib/time';
 import { cn } from '@/lib/utils';
-import { RunDownControls } from './run-down';
+import { ControllingList } from './controlling';
+import { RunDownControls, RunDownList, TestRun } from './run-down';
 import { DesktopShell, Label } from './shell';
 
 /** Before the game: start the stream in time, watch the automatic run-down, work through the checklist. */
 export function VorPage({ state }: { state: PanelState }) {
   const now = useNow();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const { pre, schedule, streaming } = state;
-  const at = (offset: number) => schedule.anchor + offset * 1000;
-  const nextIndex = schedule.steps.findIndex((s) => at(s.offset) > now);
+  const { pre, streaming } = state;
+  const schedule = state.preRundown;
   const done = pre.checklist.filter((c) => c.done).length;
   const late = now > pre.streamBy;
 
@@ -24,7 +25,6 @@ export function VorPage({ state }: { state: PanelState }) {
     <DesktopShell
       state={state}
       view="vor"
-      badge="VOR DEM SPIEL"
       header={
         <button type="button" className="text-[15px] font-semibold underline decoration-dotted underline-offset-4" onClick={() => setDialogOpen(true)}>
           Spielbeginn {hhmm(pre.kickoff)}
@@ -45,57 +45,38 @@ export function VorPage({ state }: { state: PanelState }) {
           variant="outline"
           disabled={streaming}
           className={cn(
-            'h-24 flex-col gap-1 border-2 border-foreground text-[22px] font-black tracking-wide whitespace-normal disabled:opacity-100',
-            streaming ? 'bg-background' : 'bg-foreground text-background hover:bg-foreground hover:text-background',
+            'h-24 flex-col gap-1 border-2 border-secondary text-[22px] font-black tracking-wide whitespace-normal disabled:opacity-100',
+            streaming ? 'bg-secondary' : 'border-muted-foreground bg-muted-foreground text-background hover:bg-muted-foreground hover:text-background',
           )}
           onClick={() => act('stream/start')}
         >
           {streaming ? 'STREAM LÄUFT ✓' : '▶ STREAM STARTEN'}
           <span className="text-xs font-light tracking-normal">
-            {streaming ? 'Stream, Recording und Replay-Aufnahme laufen' : 'startet Stream, Recording und Replay-Aufnahme zusammen'}
+            {streaming
+              ? `Stream${state.recording ? ', Recording' : ''} und Replay-Aufnahme laufen`
+              : `startet Stream${pre.recordGame ? ', Recording' : ''} und Replay-Aufnahme zusammen`}
           </span>
         </Button>
+        <label className="flex items-center justify-between gap-3 rounded-md bg-card px-3.5 py-2.5">
+          <span className="flex flex-col gap-0.5">
+            <span className="text-[13px] font-semibold">Spiel lokal aufnehmen</span>
+            <span className="text-xs font-light text-muted-foreground">vMix-Recording beim Stream-Start mitstarten</span>
+          </span>
+          <Switch checked={pre.recordGame} disabled={streaming} onCheckedChange={(enabled) => act('settings/record', { enabled })} />
+        </label>
         {pre.emergency && (
           <div className="flex flex-col gap-1.5 rounded-md bg-card p-3.5">
             <span className="text-[13px] font-semibold">{pre.emergency.title}</span>
             <span className="text-[13px] leading-relaxed font-light text-muted-foreground">{pre.emergency.text}</span>
           </div>
         )}
+        <ControllingList items={state.controlling.filter((c) => !c.post)} title="CONTROLLING HEUTE" hint="wie swiss unihockey prüft" />
       </div>
 
       <div className="flex flex-col gap-3">
         <Label title="ABLAUF BIS ZUM ANSPIEL"><RunDownControls schedule={schedule} /></Label>
-        <ol className="flex flex-col">
-          {schedule.steps.map((s, i) => {
-            const past = at(s.offset) <= now;
-            const isNext = i === nextIndex;
-            const tag = isNext && !s.auto ? 'jetzt' : past ? '✓' : s.tag;
-            return (
-              <li key={i} className={cn('flex min-h-14 items-center gap-3 border-b px-3 py-2', isNext && 'bg-card', past && 'text-muted-foreground')}>
-                <span className="w-16 shrink-0 text-[15px] font-black tabular-nums">{s.offset % 60 === 0 ? hhmm(at(s.offset)) : hhmmss(at(s.offset))}</span>
-                <div className="flex min-w-0 grow flex-col gap-0.5">
-                  <span className="text-sm font-semibold">{s.label}</span>
-                  <span className="text-xs font-light text-muted-foreground">{s.sub}</span>
-                </div>
-                {s.action && (
-                  <Button
-                    variant="outline"
-                    className="h-8 border border-muted-foreground bg-background px-2.5 text-[11px] font-semibold"
-                    aria-label={`${s.label} jetzt von Hand auslösen`}
-                    onClick={() => act('schedule/action', { step: i })}
-                  >
-                    ▶
-                  </Button>
-                )}
-                {tag && (
-                  <span className={cn('rounded-sm border px-2 py-[3px] text-[11px] font-black tracking-widest', isNext && !s.auto ? 'border-primary bg-primary' : past ? 'border-transparent' : 'border-foreground')}>
-                    {tag}
-                  </span>
-                )}
-              </li>
-            );
-          })}
-        </ol>
+        <RunDownList schedule={schedule} now={now} />
+        <TestRun schedule={schedule} streaming={streaming} what="den Ablauf bis zum Anspiel" />
         <span className="text-xs leading-relaxed font-light text-muted-foreground">
           Schritte mit «auto» löst die Regie zur angegebenen Zeit selbst aus, solange der Stream läuft und AUTO an ist. ▶ ist für den Notfall von Hand.
         </span>
@@ -113,7 +94,7 @@ export function VorPage({ state }: { state: PanelState }) {
               aria-pressed={c.done}
               onClick={() => act('tick', { id: c.id, done: !c.done })}
             >
-              <span className={cn('flex size-6 shrink-0 items-center justify-center rounded-md border-2 text-sm font-black', c.done ? 'border-foreground bg-foreground text-background' : 'border-muted-foreground')}>
+              <span className={cn('flex size-6 shrink-0 items-center justify-center rounded-md border-2 text-sm font-black', c.done ? 'border-muted-foreground bg-muted-foreground text-background' : 'border-input')}>
                 {c.done && '✓'}
               </span>
               <span className="flex min-w-0 grow flex-col gap-px">

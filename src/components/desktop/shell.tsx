@@ -6,12 +6,36 @@ import { useNow } from '@/hooks/use-now';
 import { hhmmss } from '@/lib/time';
 import { cn } from '@/lib/utils';
 
-export type DesktopView = 'vor' | 'live' | 'nach';
+export type DesktopView = 'vor' | 'live' | 'pause' | 'nach';
 const VIEWS: { id: DesktopView; label: string }[] = [
-  { id: 'vor', label: 'Vor dem Spiel' },
-  { id: 'live', label: 'Live' },
-  { id: 'nach', label: 'Nach dem Spiel' },
+  { id: 'vor', label: 'VOR DEM SPIEL' },
+  { id: 'live', label: 'LIVE' },
+  { id: 'pause', label: 'PAUSE' },
+  { id: 'nach', label: 'NACH DEM SPIEL' },
 ];
+
+/** The phases of a match day as tabs across the top. */
+function PhaseTabs({ view, streaming }: { view: DesktopView; streaming: boolean }) {
+  return (
+    <nav aria-label="Phase" className="grid grid-cols-4 border-b">
+      {VIEWS.map((v, i) => (
+        <a
+          key={v.id}
+          href={`#${v.id}`}
+          aria-current={v.id === view ? 'page' : undefined}
+          className={cn(
+            'flex h-12 items-center justify-center gap-2.5 border-b-[3px] border-transparent text-[13px] font-medium tracking-widest text-dim',
+            v.id === view && 'border-primary bg-card font-black text-foreground',
+          )}
+        >
+          <span className="font-light tabular-nums">{i + 1}</span>
+          {v.label}
+          {v.id === 'live' && streaming && <span className="text-primary" aria-label="Stream läuft">●</span>}
+        </a>
+      ))}
+    </nav>
+  );
+}
 
 export function Label({ title, hint, live, className, children }: { title: string; hint?: string; live?: boolean; className?: string; children?: React.ReactNode }) {
   return (
@@ -25,27 +49,24 @@ export function Label({ title, hint, live, className, children }: { title: strin
 interface Props {
   state: PanelState;
   view: DesktopView;
-  badge: string;
   header?: React.ReactNode; // right of the team names
-  footer: React.ReactNode;
+  footer: React.ReactNode | null;
   children: React.ReactNode; // the three columns
+  embedded?: boolean; // inside the phone layout, which brings its own navigation
 }
 
 /** Frame of the three desktop screens: status header, watchdog bar, column grid, footer navigation. */
-export function DesktopShell({ state, view, badge, header, footer, children }: Props) {
+export function DesktopShell({ state, view, header, footer, children, embedded }: Props) {
   const now = useNow();
   const { health, score } = state;
-  const onAir = view === 'live' && state.streaming;
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className={cn('flex flex-col', !embedded && 'min-h-dvh')}>
+      {!embedded && <PhaseTabs view={view} streaming={state.streaming} />}
       <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b px-6 py-3.5">
         <div className="flex flex-wrap items-center gap-4">
-          <Badge
-            variant={onAir ? 'default' : 'secondary'}
-            className={cn('h-auto rounded-sm px-2.5 py-[5px] text-sm font-black tracking-widest', !onAir && view !== 'live' && 'bg-foreground text-background')}
-          >
-            {view === 'live' ? (state.streaming ? 'LIVE' : 'OFF AIR') : badge}
+          <Badge variant={state.streaming ? 'default' : 'secondary'} className="h-auto rounded-sm px-2.5 py-[5px] text-sm font-black tracking-widest">
+            {state.streaming ? 'ON AIR' : 'OFF AIR'}
           </Badge>
           {score?.teams && <span className="text-[15px] font-light text-muted-foreground">{score.teams}</span>}
           {header}
@@ -84,11 +105,6 @@ export function DesktopShell({ state, view, badge, header, footer, children }: P
 
       <footer className="flex flex-wrap gap-x-6 gap-y-2 border-t px-6 py-3 text-xs font-light text-muted-foreground">
         {footer}
-        <span className="ml-auto flex gap-6">
-          {VIEWS.filter((v) => v.id !== view).map((v) => (
-            <a key={v.id} href={`#${v.id}`} className="text-foreground underline underline-offset-2">{v.label}</a>
-          ))}
-        </span>
       </footer>
     </div>
   );

@@ -11,7 +11,6 @@ import { useNow } from '@/hooks/use-now';
 import { act } from '@/lib/api';
 import { camsLabel, KEYS } from '@/lib/format';
 import { mmss } from '@/lib/time';
-import { ControllingList } from './controlling';
 import { RunDownControls } from './run-down';
 import { DesktopShell, Label } from './shell';
 
@@ -21,7 +20,7 @@ function Key({ keys, children }: { keys: string; children: string }) {
 
 function Stat({ value, label }: { value: string; label: string }) {
   return (
-    <div className="flex h-14 flex-col justify-center rounded-md border-2 border-foreground px-3">
+    <div className="flex h-14 flex-col justify-center rounded-md bg-card px-3">
       <span className="text-xl leading-tight font-black tabular-nums">{value}</span>
       <span className="text-[11px] font-light text-muted-foreground">{label}</span>
     </div>
@@ -84,7 +83,6 @@ export function DesktopPage({ state, marking }: { state: PanelState; marking: Ma
     <DesktopShell
       state={state}
       view="live"
-      badge="LIVE"
       header={
         <>
           {score && (score.home || score.away) && <span className="text-[28px] leading-none font-black">{score.home}:{score.away}</span>}
@@ -104,7 +102,7 @@ export function DesktopPage({ state, marking }: { state: PanelState; marking: Ma
     >
       {/* Run-down, audio, sponsor, controlling */}
       <div className="flex flex-col gap-3">
-        <Label title={next ? `ABLAUF · in ${mmss((schedule.anchor + next.offset * 1000 - now) / 1000)}` : `ABLAUF · ${schedule.title}`}>
+        <Label title={next ? `NÄCHSTER SCHRITT · in ${mmss((schedule.anchor + next.offset * 1000 - now) / 1000)}` : 'NÄCHSTER SCHRITT'}>
           <RunDownControls schedule={schedule} />
         </Label>
         <NextAction state={state} now={now} />
@@ -124,7 +122,6 @@ export function DesktopPage({ state, marking }: { state: PanelState; marking: Ma
           </>
         )}
         {sponsor && <SponsorRow sponsor={sponsor} />}
-        <ControllingList items={state.controlling.filter((c) => !c.post)} title="CONTROLLING HEUTE" hint="wie swiss unihockey prüft" />
       </div>
 
       {/* Cameras */}
@@ -139,7 +136,7 @@ export function DesktopPage({ state, marking }: { state: PanelState; marking: Ma
             <span className="truncate text-[26px] leading-tight font-black">{pgm ? `CAM ${pgm.id}` : state.programTitle || '–'}</span>
             <span className="text-[13px] font-medium">{pgm?.role}</span>
           </div>
-          <div className="flex h-24 flex-col justify-center gap-0.5 rounded-md bg-foreground px-4 text-background">
+          <div className="flex h-24 flex-col justify-center gap-0.5 rounded-md bg-muted-foreground px-4 text-background">
             <Caption>ALS NÄCHSTES</Caption>
             <span className="text-[26px] leading-tight font-black">{pvw ? `CAM ${pvw.id}` : '–'}</span>
             <span className="text-[13px] font-medium">{pvw?.role}</span>

@@ -15,7 +15,7 @@ const toggle = (t: Tick) => act('tick', { id: t.id, done: !t.done });
 
 function Stat({ value, label }: { value: string; label: string }) {
   return (
-    <div className="flex h-20 flex-col justify-center rounded-md border-2 border-foreground px-3">
+    <div className="flex h-20 flex-col justify-center rounded-md bg-card px-3">
       <span className="text-2xl font-black tabular-nums">{value}</span>
       <span className="text-[11px] font-light text-muted-foreground">{label}</span>
     </div>
@@ -23,7 +23,7 @@ function Stat({ value, label }: { value: string; label: string }) {
 }
 
 /** After the final whistle: wrap up the stream, record the highlight video, tick off the interviews. */
-export function NachPage({ state }: { state: PanelState }) {
+export function NachPage({ state, embedded }: { state: PanelState; embedded?: boolean }) {
   const [confirm, setConfirm] = useState(false);
   const { post, score } = state;
   const { video, finish } = post;
@@ -34,7 +34,7 @@ export function NachPage({ state }: { state: PanelState }) {
     <DesktopShell
       state={state}
       view="nach"
-      badge="NACH DEM SPIEL"
+      embedded={embedded}
       header={score && (score.home || score.away) && <span className="text-[28px] leading-none font-black">{score.home}:{score.away}</span>}
       footer={<span>Das lokale Recording bleibt in vMix gespeichert, falls swiss unihockey es anfordert.</span>}
     >
@@ -89,7 +89,7 @@ export function NachPage({ state }: { state: PanelState }) {
                 key={s}
                 variant="outline"
                 disabled={video.status === 'running'}
-                className={cn('h-14 border-2 border-muted-foreground bg-background text-sm font-black', s === video.speed && 'border-foreground bg-foreground text-background hover:bg-foreground hover:text-background')}
+                className={cn('h-14 border-2 border-secondary bg-secondary text-sm font-black', s === video.speed && 'border-muted-foreground bg-muted-foreground text-background hover:bg-muted-foreground hover:text-background')}
                 aria-pressed={s === video.speed}
                 onClick={() => act('video/speed', { speed: s })}
               >
@@ -100,7 +100,7 @@ export function NachPage({ state }: { state: PanelState }) {
           <Button
             variant={video.status === 'done' ? 'outline' : 'default'}
             disabled={video.status === 'running' || busy}
-            className={cn('h-24 flex-col gap-1 border-2 text-xl font-black tracking-wide whitespace-normal', video.status === 'done' ? 'border-foreground bg-background' : 'border-primary')}
+            className={cn('h-24 flex-col gap-1 border-2 text-xl font-black tracking-wide whitespace-normal', video.status === 'done' ? 'border-secondary bg-secondary' : 'border-primary')}
             onClick={() => act('video/export')}
           >
             {video.status === 'done' ? 'AUFGENOMMEN ✓' : video.status === 'running' ? `AUFNAHME LÄUFT · ${video.step + 1}/${video.timeline.length}` : '▶ HIGHLIGHT-VIDEO AUFNEHMEN'}
@@ -113,7 +113,7 @@ export function NachPage({ state }: { state: PanelState }) {
           {video.status === 'done' && (
             <Button
               variant="outline"
-              className={cn('h-11 border-2 text-[13px] font-black', video.uploaded.done ? 'border-muted-foreground bg-background text-muted-foreground' : 'border-foreground bg-foreground text-background hover:bg-foreground hover:text-background')}
+              className={cn('h-11 border-2 text-[13px] font-black', video.uploaded.done ? 'border-secondary bg-background text-muted-foreground' : 'border-muted-foreground bg-muted-foreground text-background hover:bg-muted-foreground hover:text-background')}
               aria-pressed={video.uploaded.done}
               onClick={() => toggle(video.uploaded)}
             >
@@ -133,7 +133,7 @@ export function NachPage({ state }: { state: PanelState }) {
             </div>
             <Button
               variant="outline"
-              className={cn('h-11 shrink-0 border-2 px-3.5 text-xs font-black', iv.done ? 'border-muted-foreground bg-background text-muted-foreground' : 'border-foreground bg-foreground text-background hover:bg-foreground hover:text-background')}
+              className={cn('h-11 shrink-0 border-2 px-3.5 text-xs font-black', iv.done ? 'border-secondary bg-background text-muted-foreground' : 'border-muted-foreground bg-muted-foreground text-background hover:bg-muted-foreground hover:text-background')}
               aria-pressed={iv.done}
               onClick={() => toggle(iv)}
             >
