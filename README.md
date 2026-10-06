@@ -53,6 +53,14 @@ last event and steps back to the one that is meant. This only stays correct if e
 copied and deleted through the panel alone, and if the tabs are empty when a new game starts ("Neues Spiel" clears
 the panel's book, not vMix).
 
+## Preview during sequences
+
+While a sequence runs (pre-game steps, break, back to the game, end of game, highlight video) the panel keeps the
+next picture in vMix's preview: a clip rewound to its first frame, or the camera that follows. It still takes each
+picture to program itself, so nothing depends on what is in preview at that moment, but the operator sees what
+comes next, and after a replay reel vMix returns to exactly that input. Outside of sequences the panel leaves
+preview to the operator.
+
 ## Automatic steps
 
 Run-down steps with `"auto": true` are triggered by the panel at their time, as long as the stream is running and
@@ -95,8 +103,10 @@ ends up in vMix's recording folder. Clip lengths come from vMix, the scene lengt
 | `controlling` | The controlling list. `check` is one of `streamLead`, `onAir` (input was on program; optionally in the n-th `round` of a `schedule`), `logos`, `audio`, `stalls`, `noInterruption`, `videoExported`, `ticks`. `post: true` shows the item only after the game. |
 | `postGame` | Wrap-up `steps`, the `finish` sequence (ABSCHLUSS), `interviews` and the `highlightVideo` template. |
 
-Calls in `action.calls`, `start.calls` and `finish.calls` are vMix API calls such as
-`{ "Function": "CutDirect", "Input": "Resultat" }`, pauses `{ "wait": 500 }`, or panel steps `{ "panel": "…" }`:
+Calls in `action.calls`, `start.calls`, `end.calls` and `finish.calls` are vMix API calls such as
+`{ "Function": "CutDirect", "Input": "Resultat" }`, video clips `{ "clip": "Name.mp4" }` (lined up in vMix's preview,
+taken to program from the start; the sequence goes on when the clip has finished, or at once with `"wait": false`
+for a looping clip), pauses `{ "wait": 500 }`, or panel steps `{ "panel": "…" }`:
 `audioPause`, `audioGame`, `logosOn`, `logosOff`, `overlaysOff` (all overlay channels off and kept off) / `overlaysOn` (put the same ones back), `highlightClip` (intro clips, highlight reel, outro clips from `replay.highlightClip`; without highlights only the intro clips run), `playHighlights`, `waitPlayback` (until the replay is over), `startAll`, `stopAll`
 (stream, recording and replay recording). If one call fails the rest still runs and the failure shows as an alert.
 

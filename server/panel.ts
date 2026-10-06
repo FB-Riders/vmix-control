@@ -314,7 +314,7 @@ export class Panel {
       if (ref !== undefined && ref !== '' && !this.findInput(ref)) w.push(`${what}: Input «${ref}» nicht in vMix gefunden`);
     };
     const needCalls = (calls: VmixCall[], what: string) => {
-      const refs = calls.flatMap((c) => ('Input' in c && c.Input !== undefined ? [c.Input] : []));
+      const refs = calls.flatMap((c) => ('clip' in c ? [c.clip] : 'Input' in c && c.Input !== undefined ? [c.Input] : []));
       new Set(refs).forEach((i) => need(i, what));
     };
     cfg.cams.forEach((c) => need(c.input, `CAM ${c.id}`));
@@ -562,9 +562,10 @@ export class Panel {
   /** Runs a configured sequence. A failing call does not stop the rest (e.g. a missing clip must not keep the audio muted). */
   private async run(calls: VmixCall[], maxWaitMs = Infinity): Promise<void> {
     let failure: unknown;
-    for (const c of calls) {
+    for (const [i, c] of calls.entries()) {
       try {
-        if ('wait' in c) await sleep(Math.min(c.wait, maxWaitMs));
+        if ('wait' in c && !('clip' in c)) await sleep(Math.min(c.wait, maxWaitMs));
+        else if ('clip' in c) await this.playClip(c.clip, { wait: c.wait, seconds: c.seconds, next: this.nextPicture(calls.slice(i + 1)) });
         else if ('panel' in c && c.panel === 'waitPlayback') await this.waitPlayback();
         else if ('panel' in c && c.panel === 'highlightClip') await this.clip(this.cfg.replay.highlightTab, this.cfg.replay.highlightMusic || undefined);
         else if ('panel' in c && c.panel === 'periodClip') await this.clip(this.breakTab(), this.cfg.audio?.music?.input); // the break's scenes run under the general music
@@ -576,7 +577,17 @@ export class Panel {
     if (failure) throw failure;
   }
 
-  private async step(c: Exclude<VmixCall, { wait: number }>): Promise<void> {
+  /** The input the rest of a sequence puts on program next (a clip or a cut), to line it up in preview meanwhile. */
+  private nextPicture(rest: VmixCall[]): string | number | undefined {
+    for (const c of rest) {
+      if ('clip' in c) return c.clip;
+      if ('Function' in c && (c.Function === 'CutDirect' || c.Function === 'Cut') && c.Input !== undefined) return c.Input;
+      if ('panel' in c && (c.panel === 'highlightClip' || c.panel === 'periodClip' || c.panel === 'playHighlights')) return undefined; // a reel follows
+    }
+    return undefined;
+  }
+
+  private async step(c: Exclude<VmixCall, { wait: number } | { clip: string }>): Promise<void> {
     if (!('panel' in c)) { await this.vmix.call(c.Input !== undefined ? { ...c, Input: this.ref(c.Input) } : c); return; }
     if (c.panel === 'playHighlights') await this.playReel(this.cfg.replay.highlightTab, this.cfg.replay.highlightMusic || undefined);
     else if (c.panel === 'audioGame' || c.panel === 'audioPause') await this.setAudio(c.panel === 'audioGame');
@@ -724,21 +735,55 @@ export class Panel {
   }
 
   /**
-   * Cuts to a clip, plays it from the start and waits until it is over.
-   * alreadyOn: vMix may have gone to this clip by itself (it returns to the cued input after a reel); if it is
-   * already playing on program it is left to finish instead of being started a second time.
+   * Lines an input up in vMix's preview: a video clip rewound to its first frame, so the operator sees what comes
+   * next and the clip is loaded before it is taken. Never touches the input that is on program.
    */
-  private async playClip(input: string, alreadyOn = false): Promise<void> {
+  private async cue(input: string | number): Promise<void> {
     const inp = this.findInput(input);
-    if (alreadyOn && inp && this.activeInput() === inp && inp.state === 'Running') {
-      await sleep(Math.max(0, inp.duration - inp.position) + 200);
-      return;
-    }
-    const ref = this.ref(input);
+    if (!inp || this.activeInput() === inp) return;
+    const calls = inp.duration > 0 ? ['Restart', 'Pause', 'PreviewInput'] : ['PreviewInput'];
     await this.exclusive(async () => {
-      for (const fn of ['Restart', 'CutDirect', 'Play']) await this.vmix.call({ Function: fn, Input: ref });
-    });
-    await sleep((this.findInput(input)?.duration ?? 0) + 200);
+      for (const fn of calls) await this.vmix.call({ Function: fn, Input: inp.key });
+    }).catch(() => {});
+  }
+
+  /**
+   * Plays a video clip on program: cued in preview, taken, played from its start. Then the next picture of the
+   * sequence is cued, and (unless wait is false) this returns when the clip has finished.
+   * alreadyOn: vMix may have gone to this clip by itself (it returns to preview after a reel); if it is already
+   * playing on program it is left to finish instead of being started a second time.
+   */
+  private async playClip(input: string, opts: { wait?: boolean; seconds?: number; next?: string | number; alreadyOn?: boolean } = {}): Promise<void> {
+    const inp = this.findInput(input);
+    const running = opts.alreadyOn && inp && this.activeInput() === inp && inp.state === 'Running';
+    if (!running) {
+      await this.cue(input);
+      const ref = this.ref(input);
+      await this.exclusive(async () => {
+        for (const fn of ['CutDirect', 'Play']) await this.vmix.call({ Function: fn, Input: ref });
+      });
+    }
+    const started = Date.now() - (running && inp ? inp.position : 0);
+    if (opts.next !== undefined) {
+      await sleep(700); // let vMix report the clip on program first, cue() leaves the program input alone
+      await this.cue(opts.next);
+    }
+    if (opts.wait !== false) await this.clipFinished(input, started, opts.seconds);
+  }
+
+  /** Waits until a clip that started at `started` is over: by its length, sooner if vMix reports it has stopped or is no longer on program. */
+  private async clipFinished(input: string, started: number, seconds?: number): Promise<void> {
+    const length = seconds !== undefined ? seconds * 1000 : this.findInput(input)?.duration ?? 0;
+    for (;;) {
+      const elapsed = Date.now() - started;
+      const inp = this.findInput(input);
+      let remaining = length - elapsed;
+      // vMix's own position corrects the clock once the clip is seen running (a slow start, a seek by hand).
+      if (inp && seconds === undefined && inp.state === 'Running' && inp.position > 0) remaining = Math.min(remaining, inp.duration - inp.position);
+      if (remaining <= 0) return;
+      if (elapsed > 1500 && inp && (this.activeInput() !== inp || inp.state !== 'Running')) return; // cut away, or ended early
+      await sleep(Math.min(remaining, 200));
+    }
   }
 
   /**
@@ -750,11 +795,11 @@ export class Panel {
     // The music is not switched here: directSound() follows the program (clips without music, scenes with it).
     this.sequences++;
     try {
-      for (const c of intro) await this.playClip(c);
+      for (const [i, c] of intro.entries()) await this.playClip(c, { next: intro[i + 1] });
       if (!(await this.exclusive(() => this.playReel(tab, music)))) return;
       if (outro.length) await this.cueAfterReel(outro[0]);
       await this.waitPlayback();
-      for (const [i, c] of outro.entries()) await this.playClip(c, i === 0);
+      for (const [i, c] of outro.entries()) await this.playClip(c, { next: outro[i + 1], alreadyOn: i === 0 });
     } finally {
       this.sequences--;
     }
@@ -767,10 +812,7 @@ export class Panel {
    */
   private async cueAfterReel(input: string): Promise<void> {
     for (const end = Date.now() + 3000; !this.playing?.seen && Date.now() < end;) await sleep(200);
-    const ref = this.ref(input);
-    await this.exclusive(async () => {
-      for (const fn of ['Restart', 'Pause', 'PreviewInput']) await this.vmix.call({ Function: fn, Input: ref });
-    }).catch(() => {});
+    await this.cue(input); // does nothing while that clip is still on program
   }
 
   private async waitPlayback(maxMs = 10 * 60_000): Promise<void> {
@@ -815,9 +857,8 @@ export class Panel {
         this.video.step = i;
         this.broadcast();
         if ('input' in item) {
-          const input = this.ref(item.input);
-          await this.run([{ Function: 'Restart', Input: input }, { Function: 'CutDirect', Input: input }, { Function: 'Play', Input: input }]);
-          await sleep(this.clipSeconds(item) * 1000);
+          const after = template[i + 1];
+          await this.playClip(item.input, { seconds: item.seconds, next: after && 'input' in after ? after.input : undefined });
         } else {
           const started = await this.exclusive(async () => {
             await this.vmix.call({ Function: 'ReplaySetSpeed', Value: this.video.speed / 100 });
@@ -864,7 +905,8 @@ export class Panel {
       const realGap = offsetSec(steps[i + 1].at) - offsetSec(step.at);
       // Only a clip that was cut to program needs its running time (not background music); a step's own holds have
       // already passed inside run(). Long clips such as the break video are only sampled.
-      const clips = calls.map((c) => ('Function' in c && c.Function === 'CutDirect' ? (this.findInput(c.Input)?.duration ?? 0) / 1000 : 0));
+      const started = (c: VmixCall) => ('clip' in c ? (c.wait ? undefined : c.clip) : 'Function' in c && c.Function === 'CutDirect' ? c.Input : undefined);
+      const clips = calls.map((c) => (this.findInput(started(c))?.duration ?? 0) / 1000);
       const longest = Math.max(0, ...clips);
       const clipSec = longest > SIM_FULL_CLIP_SEC ? SIM_LONG_CLIP_SEC : longest;
       const waitSec = Math.min(Math.max(realGap, 3), Math.max(4, clipSec + 1.5));

@@ -216,16 +216,8 @@
                 "Input": "General Music*"
               },
               {
-                "Function": "Restart",
-                "Input": "Intro L-UPL.mp4"
-              },
-              {
-                "Function": "CutDirect",
-                "Input": "Intro L-UPL.mp4"
-              },
-              {
-                "Function": "Play",
-                "Input": "Intro L-UPL.mp4"
+                "clip": "Intro L-UPL.mp4",
+                "wait": false
               },
               {
                 "Function": "AudioOn",
@@ -291,22 +283,10 @@
             "required": true,
             "calls": [
               {
-                "Function": "Restart",
-                "Input": "mob_jubel_web_D.mp4"
-              },
-              {
-                "Function": "CutDirect",
-                "Input": "mob_jubel_web_D.mp4"
-              },
-              {
-                "Function": "Play",
-                "Input": "mob_jubel_web_D.mp4"
-              },
-              {
                 "panel": "audioGame"
               },
               {
-                "wait": 10200
+                "clip": "mob_jubel_web_D.mp4"
               },
               {
                 "Function": "CutDirect",
@@ -354,16 +334,8 @@
             "Input": "Pausenvideo_FBRiders_Loop_5min.mp4"
           },
           {
-            "Function": "Restart",
-            "Input": "Pausenvideo_FBRiders_Loop_5min.mp4"
-          },
-          {
-            "Function": "CutDirect",
-            "Input": "Pausenvideo_FBRiders_Loop_5min.mp4"
-          },
-          {
-            "Function": "Play",
-            "Input": "Pausenvideo_FBRiders_Loop_5min.mp4"
+            "clip": "Pausenvideo_FBRiders_Loop_5min.mp4",
+            "wait": false
           },
           {
             "panel": "breakSound"
@@ -383,19 +355,7 @@
             "Input": "Pausenvideo_FBRiders_Loop_5min.mp4"
           },
           {
-            "Function": "Restart",
-            "Input": "Presenter - Lidl Schweiz Partner Unihockey Women v2.mp4"
-          },
-          {
-            "Function": "CutDirect",
-            "Input": "Presenter - Lidl Schweiz Partner Unihockey Women v2.mp4"
-          },
-          {
-            "Function": "Play",
-            "Input": "Presenter - Lidl Schweiz Partner Unihockey Women v2.mp4"
-          },
-          {
-            "wait": 6200
+            "clip": "Presenter - Lidl Schweiz Partner Unihockey Women v2.mp4"
           },
           {
             "Function": "CutDirect",

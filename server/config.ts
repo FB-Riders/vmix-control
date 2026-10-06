@@ -4,6 +4,9 @@ import { z } from 'zod';
 
 const vmixCall = z.union([
   z.object({ wait: z.number().positive() }),
+  // A video clip: lined up in vMix's preview, taken to program from its start, and (unless wait is false, e.g. for a
+  // looping clip) the sequence goes on when it has finished. `seconds` overrides the clip's own length.
+  z.object({ clip: z.string(), wait: z.boolean().default(true), seconds: z.number().positive().optional() }),
   // Things the panel does itself rather than a single vMix function.
   z.object({ panel: z.enum(['audioGame', 'audioPause', 'playHighlights', 'highlightClip', 'periodClip', 'breakSound', 'overlaysOff', 'overlaysOn', 'waitPlayback', 'startAll', 'stopAll', 'logosOn', 'logosOff']) }),
   z.object({
