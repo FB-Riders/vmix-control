@@ -4,3 +4,4 @@ data/
 *.tsbuildinfo
 config.backup-*.json
 .DS_Store
+release/
