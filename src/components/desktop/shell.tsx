@@ -40,7 +40,7 @@ function PhaseTabs({ view, streaming }: { view: DesktopView; streaming: boolean 
 
 export function Label({ title, hint, live, className, children }: { title: string; hint?: string; live?: boolean; className?: string; children?: React.ReactNode }) {
   return (
-    <div className={cn('flex h-5 items-center justify-between gap-2', className)}>
+    <div className={cn('flex min-h-7 flex-wrap items-center justify-between gap-x-2 gap-y-1.5', className)}>
       <Caption className={cn('text-[13px]', live && 'font-black text-primary')}>{title}</Caption>
       {children ?? (hint && <span className="text-xs font-light text-muted-foreground tabular-nums">{hint}</span>)}
     </div>
@@ -94,7 +94,7 @@ export function DesktopShell({ state, view, header, footer, children, embedded }
         {state.streaming && !health.alerts.length && <span className="ml-auto font-semibold text-foreground">alles im Soll ✓</span>}
       </div>
 
-      <main className="grid grow grid-cols-[repeat(auto-fit,minmax(min(400px,100%),1fr))] content-start items-start gap-6 px-6 py-5">
+      <main className="grid grow grid-cols-[repeat(auto-fit,minmax(min(350px,100%),1fr))] content-start items-start gap-6 px-6 py-5">
         {children}
       </main>
 

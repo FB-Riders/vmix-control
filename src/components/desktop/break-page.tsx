@@ -127,7 +127,7 @@ export function BreakPage({ state, embedded }: { state: PanelState; embedded?: b
         {state.music && <MusicRow music={state.music} />}
 
         <Label title="SZENEN FÜR DIE PAUSE" hint={`${replay.periods[replay.breakPeriod]?.count ?? 0} Szenen`} className="mt-3" />
-        <div className="grid auto-cols-fr grid-flow-col gap-3">
+        <div className="grid grid-cols-2 gap-3">
           {replay.periods.map((p, i) => (
             <Button
               key={p.tab}

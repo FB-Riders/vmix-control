@@ -10,7 +10,7 @@ import type { Marking } from '@/hooks/use-marking';
 import { useNow } from '@/hooks/use-now';
 import { act } from '@/lib/api';
 import { camsLabel, KEYS } from '@/lib/format';
-import { mmss } from '@/lib/time';
+import { isOpen, mmss } from '@/lib/time';
 import { RunDownControls } from './run-down';
 import { DesktopShell, Label } from './shell';
 
@@ -31,7 +31,7 @@ function Stat({ value, label }: { value: string; label: string }) {
 function NextAction({ state, now }: { state: PanelState; now: number }) {
   const { schedule } = state;
   // A step without a fixed time (e.g. the clip right before the bully) stays the next action until it was triggered.
-  const waiting = schedule.steps.findIndex((s) => s.pending && schedule.anchor + s.offset * 1000 - now < 120_000);
+  const waiting = schedule.steps.findIndex((s) => s.pending && isOpen(schedule.anchor + s.offset * 1000, now));
   const nextIndex = waiting >= 0 ? waiting : schedule.steps.findIndex((s) => schedule.anchor + s.offset * 1000 > now);
   const next = schedule.steps[nextIndex];
   const tile = 'h-24 flex-col gap-0.5 whitespace-normal';

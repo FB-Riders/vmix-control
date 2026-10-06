@@ -1,7 +1,7 @@
 import type { ScheduleState } from '@shared/state';
 import { Button } from '@/components/ui/button';
 import { act } from '@/lib/api';
-import { hhmm, hhmmss, offsetLabel } from '@/lib/time';
+import { hhmm, hhmmss, isOpen, offsetLabel } from '@/lib/time';
 import { cn } from '@/lib/utils';
 
 const small = 'h-7 border px-2 text-[11px] font-semibold';
@@ -35,7 +35,7 @@ export function RunDownList({ schedule, now, compact, idle }: { schedule: Schedu
       {schedule.steps.map((s, i) => {
         const result = sim?.results[i];
         // A step the operator still has to trigger stays open and marked, even after its planned time.
-        const waiting = !sim && !idle && s.pending && at(s.offset) - now < 120_000;
+        const waiting = !sim && !idle && s.pending && isOpen(at(s.offset), now);
         const past = sim ? !!result && i !== nextIndex : !idle && at(s.offset) <= now && !waiting;
         const isNext = i === nextIndex || waiting;
         const failed = !!result && !result.ok;

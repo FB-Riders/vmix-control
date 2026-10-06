@@ -1,3 +1,6 @@
+/** A step the operator must trigger counts as open from 2 minutes before its planned time until 15 minutes after. */
+export const isOpen = (dueMs: number, now: number) => dueMs - now < 120_000 && now - dueMs < 15 * 60_000;
+
 export const pad = (n: number) => String(n).padStart(2, '0');
 
 /** Seconds as mm:ss, or h:mm:ss from one hour up. */

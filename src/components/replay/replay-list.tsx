@@ -74,15 +74,25 @@ export function ReplayList({ replay, visible, desktop }: Props) {
             <Button
               variant="ghost"
               disabled={r.locked}
-              className={cn(control, 'shrink-0 p-0 hover:bg-transparent disabled:opacity-100', desktop ? 'w-9 text-xl' : 'w-7 text-lg', !r.highlight && 'text-muted-foreground')}
+              className={cn(control, 'shrink-0 p-0 hover:bg-transparent disabled:opacity-100', desktop ? 'w-8 text-xl' : 'w-7 text-lg', !r.highlight && 'text-muted-foreground')}
               aria-label={r.locked ? `${r.type}, immer im Highlight-Video` : r.highlight ? 'Aus Highlight-Video entfernen' : 'Ins Highlight-Video aufnehmen'}
               aria-pressed={r.highlight}
               onClick={() => act('replay/fav', { id: r.id, fav: !r.highlight })}
             >
               {r.highlight ? '★' : '☆'}
             </Button>
-            <span className={cn('shrink-0 font-semibold tabular-nums', desktop ? 'text-[13px]' : 'w-[34px] text-xs')}>{r.time}</span>
-            <span className={cn('min-w-0 grow truncate font-black', desktop ? 'text-[13px]' : 'text-xs')}>{r.type.toUpperCase()}</span>
+            {desktop ? (
+              // Type over time, so the row also fits a column of under 400 px.
+              <span className="flex min-w-0 grow flex-col">
+                <span className="truncate text-[13px] leading-tight font-black">{r.type.toUpperCase()}</span>
+                <span className="text-xs font-light text-muted-foreground tabular-nums">{r.time}</span>
+              </span>
+            ) : (
+              <>
+                <span className="w-[34px] shrink-0 text-xs font-semibold tabular-nums">{r.time}</span>
+                <span className="min-w-0 grow truncate text-xs font-black">{r.type.toUpperCase()}</span>
+              </>
+            )}
             <div className="flex gap-1">
               {replay.cams.map((cam) => {
                 const on = r.cams.includes(cam);
@@ -107,7 +117,7 @@ export function ReplayList({ replay, visible, desktop }: Props) {
             </div>
             <Button
               variant="outline"
-              className={cn(control, 'shrink-0 border border-input bg-transparent p-0', desktop ? 'w-11' : 'w-[34px]')}
+              className={cn(control, 'shrink-0 border border-input bg-transparent p-0', desktop ? 'w-9' : 'w-[34px]')}
               aria-label={`${r.type} von ${r.time} in der vMix-Preview ansehen`}
               onClick={() => act('replay/preview', { id: r.id })}
             >
@@ -115,7 +125,7 @@ export function ReplayList({ replay, visible, desktop }: Props) {
             </Button>
             <Button
               variant="outline"
-              className={cn(control, 'shrink-0 gap-1 border p-0 font-black', desktop ? 'w-[68px] text-[13px]' : 'w-10 text-[11px]', r.playing ? 'border-background bg-background hover:bg-background' : 'border-input bg-transparent')}
+              className={cn(control, 'shrink-0 gap-1 border p-0 font-black', desktop ? 'w-[64px] text-[13px]' : 'w-10 text-[11px]', r.playing ? 'border-background bg-background hover:bg-background' : 'border-input bg-transparent')}
               aria-label={`${r.type} von ${r.time} mit Stinger abspielen`}
               onClick={() => act('replay/play', { id: r.id })}
             >
@@ -124,7 +134,7 @@ export function ReplayList({ replay, visible, desktop }: Props) {
             <Button
               variant="outline"
               className={cn(
-                control, 'shrink-0 border-2 p-0 text-[11px] font-black', desktop ? 'w-9' : 'w-7',
+                control, 'shrink-0 border-2 p-0 text-[11px] font-black', desktop ? 'w-8' : 'w-7',
                 deleting === r.id ? 'border-muted-foreground bg-muted-foreground text-background hover:bg-muted-foreground hover:text-background' : 'border-transparent bg-transparent text-muted-foreground',
               )}
               aria-label={deleting === r.id ? `${r.type} von ${r.time} wirklich löschen` : `${r.type} von ${r.time} löschen`}
