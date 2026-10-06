@@ -34,8 +34,10 @@ export function RunDownList({ schedule, now, compact, idle }: { schedule: Schedu
     <ol className="flex flex-col">
       {schedule.steps.map((s, i) => {
         const result = sim?.results[i];
-        const past = sim ? !!result && i !== nextIndex : !idle && at(s.offset) <= now;
-        const isNext = i === nextIndex;
+        // A step the operator still has to trigger stays open and marked, even after its planned time.
+        const waiting = !sim && !idle && s.pending && at(s.offset) - now < 120_000;
+        const past = sim ? !!result && i !== nextIndex : !idle && at(s.offset) <= now && !waiting;
+        const isNext = i === nextIndex || waiting;
         const failed = !!result && !result.ok;
         const hot = failed || (isNext && (!!sim || !s.auto)); // red tag: needs attention
         const tag = failed ? 'FEHLER' : sim ? (isNext ? 'läuft' : past ? '✓' : s.tag) : isNext && !s.auto ? 'jetzt' : past ? '✓' : s.tag;

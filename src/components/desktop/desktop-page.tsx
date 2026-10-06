@@ -1,5 +1,5 @@
 import type { PanelState } from '@shared/state';
-import { AudioPresetButton, AudioSources } from '@/components/audio';
+import { AudioPresetButton, AudioSources, MusicRow } from '@/components/audio';
 import { Caption } from '@/components/caption';
 import { ProgramRow, PreviewRow } from '@/components/live/camera-bus';
 import { MarkButtons } from '@/components/replay/mark-buttons';
@@ -30,9 +30,22 @@ function Stat({ value, label }: { value: string; label: string }) {
 /** The big tile at the top of the run-down column: whatever the operator has to trigger next. */
 function NextAction({ state, now }: { state: PanelState; now: number }) {
   const { schedule } = state;
-  const nextIndex = schedule.steps.findIndex((s) => schedule.anchor + s.offset * 1000 > now);
+  // A step without a fixed time (e.g. the clip right before the bully) stays the next action until it was triggered.
+  const waiting = schedule.steps.findIndex((s) => s.pending && schedule.anchor + s.offset * 1000 - now < 120_000);
+  const nextIndex = waiting >= 0 ? waiting : schedule.steps.findIndex((s) => schedule.anchor + s.offset * 1000 > now);
   const next = schedule.steps[nextIndex];
   const tile = 'h-24 flex-col gap-0.5 whitespace-normal';
+  const brk = state.breakRundown;
+
+  if (brk?.running && brk.end) {
+    const { end } = brk;
+    return (
+      <Button className={tile} onClick={() => act('schedule/end', { id: brk.id })}>
+        <span className="text-xl font-black tracking-wide">▶ {end.label}</span>
+        {end.sub && <span className="text-[13px] font-medium">{end.sub}</span>}
+      </Button>
+    );
+  }
 
   if (next?.action) {
     return (
@@ -121,6 +134,7 @@ export function DesktopPage({ state, marking }: { state: PanelState; marking: Ma
             <AudioSources audio={audio} />
           </>
         )}
+        {state.music && <MusicRow music={state.music} />}
         {sponsor && <SponsorRow sponsor={sponsor} />}
       </div>
 

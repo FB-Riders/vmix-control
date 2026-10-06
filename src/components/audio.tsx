@@ -1,5 +1,5 @@
 import type { AudioPreset } from '@shared/actions';
-import type { AudioState } from '@shared/state';
+import type { AudioState, PanelState } from '@shared/state';
 import { Button } from '@/components/ui/button';
 import { act } from '@/lib/api';
 import { KEYS } from '@/lib/format';
@@ -67,5 +67,50 @@ export function AudioSources({ audio }: { audio: AudioState }) {
         </div>
       ))}
     </>
+  );
+}
+
+type Music = NonNullable<PanelState['music']>;
+
+/** Phone: play / pause for the background music. */
+export function MusicButton({ music }: { music: Music }) {
+  return (
+    <Button
+      variant="outline"
+      className={cn(
+        'h-12 flex-col gap-px border-2 border-secondary bg-secondary text-xs font-black',
+        music.playing && 'border-muted-foreground bg-muted-foreground text-background hover:bg-muted-foreground hover:text-background',
+      )}
+      aria-label={music.playing ? `${music.name} pausieren` : `${music.name} abspielen`}
+      aria-pressed={music.playing}
+      onClick={() => act('music', { play: !music.playing })}
+    >
+      {music.name.toUpperCase()}
+      <span className="text-[10px] font-light">{music.playing ? 'läuft · Pause' : 'abspielen'}</span>
+    </Button>
+  );
+}
+
+/** Desktop: play / pause for the background music with the current track. */
+export function MusicRow({ music }: { music: Music }) {
+  return (
+    <div className="flex items-center gap-3">
+      <Button
+        variant="outline"
+        className={cn(
+          'h-11 w-[88px] shrink-0 border-2 border-secondary bg-secondary text-[13px] font-black',
+          music.playing && 'border-muted-foreground bg-muted-foreground text-background hover:bg-muted-foreground hover:text-background',
+        )}
+        aria-label={music.playing ? `${music.name} pausieren` : `${music.name} abspielen`}
+        aria-pressed={music.playing}
+        onClick={() => act('music', { play: !music.playing })}
+      >
+        {music.playing ? 'PAUSE' : '▶ PLAY'}
+      </Button>
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <span className="text-[13px] font-medium">{music.name} · {music.playing ? 'läuft' : 'aus'}</span>
+        <span className="truncate text-xs font-light text-muted-foreground">{music.track}</span>
+      </div>
+    </div>
   );
 }

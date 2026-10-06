@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { PanelState } from '@shared/state';
-import { AudioPresetButton, AudioSources } from '@/components/audio';
+import { AudioPresetButton, AudioSources, MusicRow } from '@/components/audio';
 import { Caption } from '@/components/caption';
 import { SponsorAuto, SponsorRow } from '@/components/sponsor';
 import { Button } from '@/components/ui/button';
@@ -28,7 +28,8 @@ export function BreakPage({ state, embedded }: { state: PanelState; embedded?: b
     );
   }
 
-  const active = state.schedule.id === rundown.id && now < rundown.anchor;
+  const active = rundown.running;
+  const late = now > rundown.anchor;
   const lengths = LENGTHS.includes(rundown.start.minutes) ? LENGTHS : [rundown.start.minutes, ...LENGTHS].sort((a, b) => a - b);
 
   return (
@@ -36,16 +37,24 @@ export function BreakPage({ state, embedded }: { state: PanelState; embedded?: b
       state={state}
       view="pause"
       embedded={embedded}
-      footer={<span>Die Regie wechselt beim Start der Pause hierher und zum Anspiel zurück auf den Live-Screen.</span>}
+      footer={<span>Die Regie wechselt beim Start der Pause hierher und mit «{rundown.end?.label ?? 'Zurück'}» wieder auf den Live-Screen.</span>}
     >
       <div className="flex flex-col gap-3">
-        <Label title="PAUSE" hint={active ? `Wiederanpfiff ${hhmm(rundown.anchor)}` : 'noch nicht gestartet'} />
+        <Label title="PAUSE" hint={active ? `Wiederanpfiff geplant ${hhmm(rundown.anchor)}` : 'noch nicht gestartet'} />
         {active ? (
-          <div className="flex flex-col gap-1.5 rounded-md bg-card p-5">
-            <Caption>ANSPIEL IN</Caption>
-            <span className="text-[56px] leading-none font-black tabular-nums">{mmss((rundown.anchor - now) / 1000)}</span>
-            <span className="text-[13px] font-light text-muted-foreground">Verschiebt sich das Anspiel: mit −1 Min / +1 Min beim Ablauf anpassen.</span>
-          </div>
+          <>
+            <div className="flex flex-col gap-1.5 rounded-md bg-card p-5">
+              <Caption>{late ? 'PAUSE ÜBERZOGEN SEIT' : 'ANSPIEL IN'}</Caption>
+              <span className="text-[56px] leading-none font-black tabular-nums">{mmss(Math.abs(rundown.anchor - now) / 1000)}</span>
+              <span className="text-[13px] font-light text-muted-foreground">Die Pause endet erst mit dem Knopf, die Zeit ist nur zur Orientierung.</span>
+            </div>
+            {rundown.end && (
+              <Button className="h-24 flex-col gap-0.5 whitespace-normal" onClick={() => act('schedule/end', { id: rundown.id })}>
+                <span className="text-xl font-black tracking-wide">▶ {rundown.end.label}</span>
+                {rundown.end.sub && <span className="text-[13px] font-medium">{rundown.end.sub}</span>}
+              </Button>
+            )}
+          </>
         ) : (
           <>
             <div className="grid auto-cols-fr grid-flow-col gap-3">
@@ -75,7 +84,7 @@ export function BreakPage({ state, embedded }: { state: PanelState; embedded?: b
         <Label title="ABLAUF PAUSE"><RunDownControls schedule={rundown} /></Label>
         <RunDownList schedule={rundown} now={now} idle={!active} />
         <span className="text-xs leading-relaxed font-light text-muted-foreground">
-          {active ? 'Schritte mit «auto» löst die Regie zur angegebenen Zeit selbst aus.' : 'Zeiten relativ zum Wiederanpfiff. Nach dem Start stehen hier die Uhrzeiten.'} ▶ ist für den Notfall von Hand.
+          {active ? 'Uhrzeiten nach geplanter Pausenlänge.' : 'Zeiten relativ zum geplanten Wiederanpfiff. Nach dem Start stehen hier die Uhrzeiten.'}
         </span>
       </div>
 
@@ -84,7 +93,7 @@ export function BreakPage({ state, embedded }: { state: PanelState; embedded?: b
           <>
             <Label title="TON" hint="schaltet automatisch" />
             <span className="text-xs leading-relaxed font-light text-muted-foreground">
-              Pausenbeginn: Mikrofone stumm. Highlights: Musik an und wieder aus. Anspiel: Mikrofone an. Die Knöpfe sind nur zum Eingreifen.
+              Pausenbeginn: Mikrofone stumm. Highlights: Musik an und wieder aus. Pausenvideo: eigener Ton oder Musik, je nach Wahl unten. Zurück zum Spiel: Mikrofone an. Die Knöpfe sind nur zum Eingreifen.
             </span>
             <div className="grid grid-cols-2 gap-3">
               <AudioPresetButton audio={audio} preset="game" desktop />
@@ -93,6 +102,29 @@ export function BreakPage({ state, embedded }: { state: PanelState; embedded?: b
             <AudioSources audio={audio} />
           </>
         )}
+        {state.breakSound && (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[13px] font-medium">Ton zum Pausenvideo</span>
+            <div className="grid grid-cols-2 gap-3">
+              {[{ music: false, label: 'VIDEOTON', sub: 'Ton des Pausenvideos' }, { music: true, label: 'MUSIK', sub: 'Video stumm, Musikliste' }].map((o) => (
+                <Button
+                  key={o.label}
+                  variant="outline"
+                  className={cn(
+                    'h-14 flex-col gap-px border-2 border-secondary bg-secondary text-[15px] font-black tracking-widest',
+                    o.music === state.breakSound?.music && 'border-muted-foreground bg-muted-foreground text-background hover:bg-muted-foreground hover:text-background',
+                  )}
+                  aria-pressed={o.music === state.breakSound?.music}
+                  onClick={() => act('break/sound', { music: o.music })}
+                >
+                  {o.label}
+                  <span className="text-[11px] font-light tracking-normal">{o.sub}</span>
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+        {state.music && <MusicRow music={state.music} />}
 
         <Label title="HIGHLIGHTS" hint={`${replay.highlightCount} Szenen`} className="mt-3" />
         <Button

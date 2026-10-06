@@ -9,7 +9,6 @@ import { LivePage } from '@/components/live/live-page';
 import { Toaster } from '@/components/ui/sonner';
 import { useHotkeys } from '@/hooks/use-hotkeys';
 import { useMarking } from '@/hooks/use-marking';
-import { useNow } from '@/hooks/use-now';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { usePanel } from '@/hooks/use-panel';
 import { cn } from '@/lib/utils';
@@ -49,10 +48,8 @@ export default function App() {
     wasReady.current = ready;
   }, [ready]);
 
-  // The break screen takes over while the break runs and hands back to live at the bully.
-  const now = useNow(1000);
-  const brk = state?.breakRundown;
-  const breakActive = !!state && !!brk && state.schedule.id === brk.id && now < brk.anchor;
+  // The break screen takes over while the break runs and hands back to live when it is ended.
+  const breakActive = !!state?.breakRundown?.running;
   const wasBreak = useRef(breakActive);
   useEffect(() => {
     const h = currentHash();

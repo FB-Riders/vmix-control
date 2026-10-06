@@ -1,5 +1,5 @@
 import type { PanelState } from '@shared/state';
-import { AudioPresetButton } from '@/components/audio';
+import { AudioPresetButton, MusicButton } from '@/components/audio';
 import { Caption } from '@/components/caption';
 import { MarkButtons } from '@/components/replay/mark-buttons';
 import { ReplayList } from '@/components/replay/replay-list';
@@ -38,10 +38,11 @@ export function LivePage({ state, marking }: { state: PanelState; marking: Marki
           <ReplayList replay={replay} visible={4} currentPeriod={state.score?.period ?? ''} />
         </section>
 
-        {(audio || sponsor) && (
+        {(audio || sponsor || state.music) && (
           <section className="grid auto-cols-fr grid-flow-col gap-1.5">
             {audio && <AudioPresetButton audio={audio} preset="game" />}
             {audio && <AudioPresetButton audio={audio} preset="pause" />}
+            {state.music && <MusicButton music={state.music} />}
             {sponsor && <SponsorButton sponsor={sponsor} />}
           </section>
         )}
