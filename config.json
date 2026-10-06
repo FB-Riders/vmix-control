@@ -420,10 +420,20 @@
         {
           "at": "-10:00",
           "label": "Pausenbeginn",
-          "sub": "Mikrofone stumm, alle Einblender aus, Intros, Szenen des Drittels, Outro"
+          "sub": "Mikrofone stumm, alle Einblender aus, Liga- und Riders-Intro"
         },
         {
-          "at": "-08:00",
+          "at": "-09:45",
+          "label": "Replays {period}",
+          "sub": "{scenes} Szenen aus dem Abschnitt, mit Musik"
+        },
+        {
+          "at": "-09:00",
+          "label": "Outro",
+          "sub": "Riders-Outro, Liga-Clip"
+        },
+        {
+          "at": "-08:45",
           "label": "Pausenvideo",
           "sub": "läuft im Loop bis zum Knopf, mit eigenem Ton oder Musik"
         },

@@ -9,6 +9,7 @@ const inputs: MockInput[] = [
   { title: 'CAM M', type: 'Capture', audio: 0.04 },
   { title: 'CAM R', type: 'Capture' },
   { title: 'Replay', type: 'Replay' },
+  { title: 'Replay B', type: 'ReplayPreview' },
   { title: 'Scoreboard', type: 'GT', text: { 'ScoreHome.Text': '2', 'ScoreAway.Text': '1', 'Period.Text': '2. Drittel', 'Clock.Text': '08:34', 'HomeName.Text': 'FB Riders', 'AwayName.Text': 'Gast' } },
   { title: 'Sponsor', type: 'Image' },
   { title: 'League ID', type: 'Image' },
@@ -75,7 +76,7 @@ function exec(fn: string, q: URLSearchParams): boolean {
   else if (fn === 'ReplayMarkInOutLive') s.events++;
   else if (/^ReplayPlay(Last|Selected|All)Events?ToOutput$/.test(fn)) {
     const back = s.active;
-    s.active = 4;
+    s.active = 5; // replay channel B, as in the real preset
     setTimeout(() => { s.active = back; }, 4000);
   }
   else if (ov) s.overlays[Number(ov[1]) - 1] = ov[2] === 'In' ? inp?.number ?? 0 : 0;

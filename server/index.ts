@@ -23,6 +23,9 @@ app.get('/api/events', (c) => streamSSE(c, async (stream) => {
   unsubscribe();
 }));
 
+// What the sound direction saw on program and what it switched, for troubleshooting.
+app.get('/api/debug/sound', (c) => c.text(panel.soundLog.join('\n') || 'noch nichts'));
+
 app.post('/api/:name{.+}', async (c) => {
   const name = c.req.param('name');
   if (!Object.hasOwn(actionSchemas, name)) return c.json({ error: 'Unbekannte Aktion' }, 404);

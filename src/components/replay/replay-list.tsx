@@ -66,7 +66,6 @@ export function ReplayList({ replay, visible, desktop }: Props) {
         style={{ maxHeight: visible * rowHeight + (visible - 1) * gap + rowHeight / 2 }} // half a row peeks out to show there is more
       >
       {scenes.map((r) => {
-        const time = r.time;
         return (
           <div
             key={r.id}
@@ -82,7 +81,7 @@ export function ReplayList({ replay, visible, desktop }: Props) {
             >
               {r.highlight ? '★' : '☆'}
             </Button>
-            <span className={cn('shrink-0 font-semibold tabular-nums', desktop ? 'text-[13px]' : 'w-[34px] text-xs')}>{time}</span>
+            <span className={cn('shrink-0 font-semibold tabular-nums', desktop ? 'text-[13px]' : 'w-[34px] text-xs')}>{r.time}</span>
             <span className={cn('min-w-0 grow truncate font-black', desktop ? 'text-[13px]' : 'text-xs')}>{r.type.toUpperCase()}</span>
             <div className="flex gap-1">
               {replay.cams.map((cam) => {

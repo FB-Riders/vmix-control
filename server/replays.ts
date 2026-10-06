@@ -1,3 +1,4 @@
+import { PanelError } from './errors';
 import type { VmixParams } from './vmix';
 
 /** One marked scene. It lives in the event tab of its period and, as a highlight, as a copy in the highlight tab. */
@@ -58,7 +59,11 @@ export class ReplayBook {
   /** All scenes, newest first. */
   all(): Scene[] { return [...this.scenes].reverse(); }
   find(id: number): Scene | undefined { return this.scenes.find((s) => s.id === id); }
-  tabOf(period: number): number { return this.periodTabs[period] ?? this.periodTabs[0]; }
+  tabOf(period: number): number {
+    const tab = this.periodTabs[period];
+    if (tab === undefined) throw new PanelError('Unbekannter Spielabschnitt');
+    return tab;
+  }
   count(tab: number): number { return this.tabs[tab]?.length ?? 0; }
   isHighlight(id: number): boolean { return !!this.tabs[this.highlightTab]?.includes(id); }
 
@@ -78,6 +83,8 @@ export class ReplayBook {
   /** Runs a replay function on one scene's event in one tab: the "LastEvent" variant if it is the newest there. */
   private async on(tab: number, id: number, lastFn: string, selectedFn: string, value?: string | number): Promise<void> {
     const ids = this.tabs[tab] ?? [];
+    // Never guess: stepping back from a scene the book does not have in this tab would hit someone else's event.
+    if (!ids.includes(id)) throw new PanelError(`Replay ist laut Regie nicht in vMix-Tab ${tab}. «Neues Spiel» gleicht die Liste neu ab.`);
     const back = ids.length - 1 - ids.indexOf(id);
     await this.show(tab);
     if (back === 0) { await this.call({ Function: lastFn, Value: value }); return; }
@@ -96,12 +103,14 @@ export class ReplayBook {
     const tab = this.tabOf(period);
     await this.show(tab);
     await this.call({ Function: 'ReplayMarkInOutLive', Value: seconds });
-    await this.call({ Function: 'ReplayLastEventSingleCameraOn', Value: cameras[0] });
-    for (const n of cameras.slice(1)) await this.call({ Function: 'ReplayLastEventCameraOn', Value: n });
-    await this.call({ Function: 'ReplaySetLastEventText', Value: scene.type }).catch(() => {});
+    // From here on the event exists in vMix, so it goes into the book at once: if a later call fails, the positions
+    // of all other scenes in the tab are still right.
     const created: Scene = { ...scene, id: this.nextId++, period };
     this.scenes.push(created);
     this.tabs[tab] = [...(this.tabs[tab] ?? []), created.id];
+    await this.call({ Function: 'ReplayLastEventSingleCameraOn', Value: cameras[0] });
+    for (const n of cameras.slice(1)) await this.call({ Function: 'ReplayLastEventCameraOn', Value: n });
+    await this.call({ Function: 'ReplaySetLastEventText', Value: scene.type }).catch(() => {});
     return created;
   }
 

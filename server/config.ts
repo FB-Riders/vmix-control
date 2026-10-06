@@ -57,7 +57,12 @@ const configSchema = z.object({
     seconds: z.number().positive(),
     channel: z.string().default(''),
     // vMix Replay event tabs: one per period for the marked scenes, one for the highlights (copies of starred scenes).
-    periods: z.array(z.object({ label: z.string(), short: z.string(), tab: z.number().int().min(1).max(20) })).min(1),
+    periods: z.array(z.object({ label: z.string(), short: z.string(), tab: z.number().int().min(1).max(20) })).min(1).default([
+      { label: '1. Drittel', short: '1', tab: 11 },
+      { label: '2. Drittel', short: '2', tab: 12 },
+      { label: '3. Drittel', short: '3', tab: 13 },
+      { label: 'Verlängerung', short: 'VL', tab: 14 },
+    ]),
     highlightTab: z.number().int().min(1).max(20).default(10),
     autoHighlightTypes: z.array(z.string()).default([]),
     hideScoreboard: z.boolean().default(false),
@@ -134,6 +139,11 @@ export function loadConfig(root: string): Config {
   const camIds = new Set(cfg.cams.map((c) => c.id));
   for (const m of cfg.replay.marks) for (const c of m.cams) {
     if (!camIds.has(c)) { console.error(`config.json: Replay-Markierung «${m.id}» nennt unbekannte Kamera «${c}»`); process.exit(1); }
+  }
+  const tabs = [...cfg.replay.periods.map((p) => p.tab), cfg.replay.highlightTab];
+  if (new Set(tabs).size !== tabs.length) {
+    console.error(`config.json: Die Replay-Tabs müssen alle verschieden sein (Abschnitte ${tabs.slice(0, -1).join(', ')}, Highlights ${cfg.replay.highlightTab})`);
+    process.exit(1);
   }
   return cfg;
 }
