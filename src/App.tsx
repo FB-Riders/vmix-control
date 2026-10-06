@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { AblaufPage } from '@/components/ablauf/ablauf-page';
 import { BreakPage } from '@/components/desktop/break-page';
+import { DebugBar } from '@/components/debug-bar';
 import { DesktopPage } from '@/components/desktop/desktop-page';
 import { NachPage } from '@/components/desktop/nach-page';
 import type { DesktopView } from '@/components/desktop/shell';
 import { VorPage } from '@/components/desktop/vor-page';
 import { LivePage } from '@/components/live/live-page';
 import { Toaster } from '@/components/ui/sonner';
+import { useDebugOpen } from '@/hooks/use-debug';
 import { useHotkeys } from '@/hooks/use-hotkeys';
 import { useMarking } from '@/hooks/use-marking';
 import { useMediaQuery } from '@/hooks/use-media-query';
@@ -28,6 +30,7 @@ export default function App() {
   const [hash, setHash] = useState(currentHash);
   const marking = useMarking();
   const desktop = useMediaQuery('(min-width: 1000px)');
+  const debug = useDebugOpen();
 
   useEffect(() => {
     const onHash = () => setHash(currentHash());
@@ -70,12 +73,16 @@ export default function App() {
   }
 
   if (desktop && state) {
+    // The page scrolls in its own pane, so an open debug bar sits below it instead of floating over it.
     return (
-      <>
+      <div className="flex h-dvh flex-col">
         {banner}
-        {view === 'vor' ? <VorPage state={state} /> : view === 'pause' ? <BreakPage state={state} /> : view === 'nach' ? <NachPage state={state} /> : <DesktopPage state={state} marking={marking} />}
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {view === 'vor' ? <VorPage state={state} /> : view === 'pause' ? <BreakPage state={state} /> : view === 'nach' ? <NachPage state={state} /> : <DesktopPage state={state} marking={marking} />}
+        </div>
+        {debug && <DebugBar className="h-[38dvh] shrink-0" />}
         <Toaster position="top-center" />
-      </>
+      </div>
     );
   }
 
@@ -95,6 +102,7 @@ export default function App() {
         <div key={a} role="alert" className="bg-primary px-3 py-1.5 text-center text-xs font-black">{a}</div>
       ))}
       {banner}
+      {debug && <DebugBar className="h-[45dvh] shrink-0" />}
 
       <nav aria-label="Phase" className="grid h-14 shrink-0 grid-cols-4 border-t">
         {TABS.map((t) => (

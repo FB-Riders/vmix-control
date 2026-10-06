@@ -2,6 +2,7 @@ import type { PanelState } from '@shared/state';
 import { Caption } from '@/components/caption';
 import { Indicator } from '@/components/live/status-header';
 import { Badge } from '@/components/ui/badge';
+import { setDebugOpen, useDebugOpen } from '@/hooks/use-debug';
 import { useNow } from '@/hooks/use-now';
 import { hhmmss } from '@/lib/time';
 import { cn } from '@/lib/utils';
@@ -58,10 +59,11 @@ interface Props {
 /** Frame of the three desktop screens: status header, watchdog bar, column grid, footer navigation. */
 export function DesktopShell({ state, view, header, footer, children, embedded }: Props) {
   const now = useNow();
+  const debug = useDebugOpen();
   const { health, score } = state;
 
   return (
-    <div className={cn('flex flex-col', !embedded && 'min-h-dvh')}>
+    <div className={cn('flex flex-col', !embedded && 'min-h-full')}>
       {!embedded && <PhaseTabs view={view} streaming={state.streaming} />}
       <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b px-6 py-3.5">
         <div className="flex flex-wrap items-center gap-4">
@@ -105,6 +107,9 @@ export function DesktopShell({ state, view, header, footer, children, embedded }
 
       <footer className="flex flex-wrap gap-x-6 gap-y-2 border-t px-6 py-3 text-xs font-light text-muted-foreground">
         {footer}
+        <button type="button" className={cn('ml-auto font-semibold underline underline-offset-2', debug ? 'text-foreground' : 'text-dim')} aria-pressed={debug} onClick={() => setDebugOpen(!debug)}>
+          Debug
+        </button>
       </footer>
     </div>
   );

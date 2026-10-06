@@ -43,6 +43,14 @@ The **controlling list** is filled from what actually went out: when the stream 
 program (and in which break), share of stream time with logos, drop-outs, stalls. vMix does not report bitrate,
 dropped frames or the Hub's status, so those are not shown.
 
+## Debug bar
+
+"Debug" at the right end of the desktop footer (or `?debug` in the address, also on a phone) opens a bar at the
+bottom. Left: what the panel currently believes about vMix (program, preview, overlays, replay state, period and
+tab, running sequences, sound direction). Right: what it did lately, newest first: actions from the screens, every
+command sent to vMix with its response time, the sound direction's decisions, sequences starting and ending, and
+errors. The log can be filtered, paused and copied. It is served by `GET /api/debug`.
+
 ## How replays are filed in vMix
 
 The panel keeps a book of vMix Replay's event tabs (`server/replays.ts`), because vMix does not report which events a

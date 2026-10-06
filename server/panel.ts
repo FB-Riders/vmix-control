@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { ActionInput, ActionName, ActionResult } from '../shared/actions';
+import type { DebugEntry, DebugInfo, DebugKind } from '../shared/debug';
 import type { ControllingItem, PanelState, ScheduleState, Score, SimState, Tick, VideoState } from '../shared/state';
 import type { Config, VmixCall } from './config';
 import { PanelError } from './errors';
@@ -86,7 +87,8 @@ export class Panel {
   private reelMusicStarted = false; // the highlight track was already started from the top for this reel
   private soundSeen = { key: '', since: 0 }; // what is on program, and since when
   private soundApplied = ''; // the sound state last sent to vMix
-  readonly soundLog: string[] = []; // what the sound direction saw and did, newest last (GET /api/debug/sound)
+  private readonly debugLog: DebugEntry[] = []; // actions, vMix calls, sound direction and sequences, oldest first
+  private pollMs = 0; // how long the last state request to vMix took
   private holdOverlays = false; // overlays stay off beyond the highlight scenes: whole highlight video, whole break
   private sponsor = { enabled: false, nextAt: 0, activeUntil: 0, rotation: 0 };
   private schedule: ScheduleStore;
@@ -121,6 +123,12 @@ export class Panel {
     this.breakMusic = saved.breakMusic ?? true;
     this.monitor = new Monitor(cfg, saved.log);
     this.video.speed = cfg.postGame.highlightVideo?.speeds.at(-1) ?? 100;
+    vmix.onCall = (params, ms, error) => {
+      const { Function: fn, Input, ...rest } = params;
+      const input = Input !== undefined ? ` «${this.findInput(Input)?.title ?? Input}»` : '';
+      const args = Object.entries(rest).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => ` ${k}=${v}`).join('');
+      this.log(error ? 'error' : 'vmix', `${fn}${input}${args} · ${error ? errorText(error) : `${ms} ms`}`);
+    };
   }
 
   get vmixState(): VmixState | null { return this.vm; }
@@ -145,22 +153,72 @@ export class Panel {
 
   /** Long sequences (clips, waits) run beside the queue so the operator can keep cutting; failures show up as an alert. */
   private background(label: string, fn: () => Promise<void>): void {
-    fn().catch((e) => { this.notice = { text: `${label}: ${errorText(e)}`, until: Date.now() + 60_000 }; this.broadcast(); });
+    this.log('sequence', `${label}: gestartet`);
+    fn().then(() => this.log('sequence', `${label}: fertig`), (e) => {
+      this.log('error', `${label}: ${errorText(e)}`);
+      this.notice = { text: `${label}: ${errorText(e)}`, until: Date.now() + 60_000 };
+      this.broadcast();
+    });
+  }
+
+  private log(kind: DebugKind, text: string): void {
+    this.debugLog.push({ t: Date.now(), kind, text });
+    if (this.debugLog.length > 300) this.debugLog.shift();
+  }
+
+  /** A look inside for the debug bar: what the panel believes right now, and what it did lately. */
+  debug(): DebugInfo {
+    const { vm } = this;
+    const title = (n: number | undefined) => { const i = vm?.inputs.find((x) => x.number === n); return i ? `${i.number} · ${i.title} [${i.type}, ${i.state}]` : '–'; };
+    const overlays = Object.entries(vm?.overlays ?? {}).filter(([, n]) => n).map(([ch, n]) => `${ch}: ${vm?.inputs.find((x) => x.number === n)?.title ?? n}`);
+    const running = Object.entries(this.schedule.running ?? {}).filter(([, on]) => on).map(([id]) => id);
+    const p = this.cfg.replay.periods[this.period()];
+    const yes = (b: boolean) => (b ? 'ja' : 'nein');
+    return {
+      now: Date.now(),
+      status: [
+        { label: 'vMix', value: vm ? `verbunden · ${vm.version} · Abfrage ${this.pollMs} ms` : 'NICHT erreichbar' },
+        { label: 'Programm', value: title(vm?.active) },
+        { label: 'Preview', value: title(vm?.preview) },
+        { label: 'Overlays', value: overlays.join(' · ') || 'keine' },
+        { label: 'Stream / Rec / Replay-Rec', value: `${yes(!!vm?.streaming)} / ${yes(!!vm?.recording)} / ${yes(this.replayRecording())}` },
+        { label: 'Replay auf Sendung', value: yes(this.replayOnAir()) },
+        { label: 'Wiedergabe', value: this.playing ? `${this.playing.id === null ? 'ganzer Tab' : `Szene ${this.playing.id}`} · gesehen ${yes(this.playing.seen)}` : 'keine' },
+        { label: 'Abschnitt', value: `${p.label} → vMix-Tab ${p.tab} (${this.periodManual === null ? 'auto' : 'von Hand'})` },
+        { label: 'Szenen je Tab', value: [...this.cfg.replay.periods.map((x) => `${x.tab}: ${this.book.count(x.tab)}`), `${this.cfg.replay.highlightTab}: ${this.book.count(this.cfg.replay.highlightTab)}`].join(' · ') },
+        { label: 'Sequenzen', value: `${this.sequences} laufend · Pause ${running.length ? 'läuft' : 'läuft nicht'} · AUTO ${this.autoRun ? 'an' : 'aus'}` },
+        { label: 'Ton-Regie', value: `${this.soundApplied || 'inaktiv'} · sieht ${this.soundSeen.key || 'nichts'}` },
+        { label: 'Einblender', value: `gehalten ${yes(this.holdOverlays)} · ausgeblendet ${this.hiddenOverlays.map((o) => o.channel).join(', ') || 'keine'}` },
+      ],
+      log: this.debugLog,
+    };
   }
 
   async dispatch<K extends ActionName>(name: K, input: ActionInput<K>): Promise<ActionResult<K>> {
-    const result = await this.exclusive(() => this.handlers[name](input));
-    await this.poll();
-    return result;
+    const args = Object.keys(input as object).length ? ` ${JSON.stringify(input)}` : '';
+    this.log('action', `${name}${args}`);
+    try {
+      const result = await this.exclusive(() => this.handlers[name](input));
+      await this.poll();
+      return result;
+    } catch (e) {
+      if (e instanceof PanelError) this.log('error', `${name}: ${e.message}`); // vMix failures are logged with the call itself
+      throw e;
+    }
   }
 
   // ---------- vMix state ----------
 
   async poll(): Promise<void> {
+    const asked = Date.now();
+    const wasConnected = !!this.vm;
     try {
       this.vm = await this.vmix.state();
+      this.pollMs = Date.now() - asked;
+      if (!wasConnected) this.log('vmix', `verbunden · vMix ${this.vm.version}`);
     } catch {
       this.vm = null;
+      if (wasConnected) this.log('error', 'vMix nicht mehr erreichbar');
     }
     const now = Date.now();
 
@@ -198,7 +256,9 @@ export class Panel {
       if (!step.action?.auto || now < due || this.fired.has(key)) return;
       this.fired.add(key);
       const { action } = step;
-      if (this.autoRun && this.vm?.streaming && now - due < AUTO_WINDOW_MS) {
+      if (!(this.autoRun && this.vm?.streaming && now - due < AUTO_WINDOW_MS)) {
+        this.log('sequence', `${step.label}: automatischer Schritt ausgelassen (${!this.autoRun ? 'AUTO aus' : !this.vm?.streaming ? 'kein Stream' : 'zu spät'})`);
+      } else {
         this.triggered.add(this.stepKey(sc.id, i));
         this.background(step.label, () => this.run(action.calls));
       }
@@ -645,10 +705,7 @@ export class Panel {
     this.exclusive(() => this.applySound(want)).catch(() => {});
   }
 
-  private logSound(text: string): void {
-    this.soundLog.push(`${new Date().toLocaleTimeString('de-CH')} ${text}`);
-    if (this.soundLog.length > 80) this.soundLog.shift();
-  }
+  private logSound(text: string): void { this.log('sound', text); }
 
   private async applySound(state: string): Promise<void> {
     const { audio, replay } = this.cfg;
@@ -657,7 +714,7 @@ export class Panel {
     const video = audio?.breakVideo ? this.ref(audio.breakVideo) : null;
     // One failing input (e.g. a music list that is missing) must not keep the others from switching.
     const send = (fn: string, input: string | number | null) => (input === null ? Promise.resolve()
-      : this.vmix.call({ Function: fn, Input: input }).catch((e) => this.logSound(`FEHLER ${fn}: ${errorText(e)}`)));
+      : this.vmix.call({ Function: fn, Input: input }).catch(() => {})); // the failure is in the log with the call
     const play = async (input: string | number | null) => { await send('AudioOn', input); await send('Play', input); };
 
     if (state === 'reel') {

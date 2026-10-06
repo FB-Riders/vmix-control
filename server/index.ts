@@ -23,8 +23,8 @@ app.get('/api/events', (c) => streamSSE(c, async (stream) => {
   unsubscribe();
 }));
 
-// What the sound direction saw on program and what it switched, for troubleshooting.
-app.get('/api/debug/sound', (c) => c.text(panel.soundLog.join('\n') || 'noch nichts'));
+// A look inside the panel for the debug bar.
+app.get('/api/debug', (c) => c.json(panel.debug()));
 
 app.post('/api/:name{.+}', async (c) => {
   const name = c.req.param('name');

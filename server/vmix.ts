@@ -72,6 +72,9 @@ export function parseVmix(xml: string): VmixState {
 }
 
 export class VmixClient {
+  /** Told about every function call (not the state polls): its parameters, how long it took and what went wrong. */
+  onCall?: (params: VmixParams, ms: number, error?: unknown) => void;
+
   constructor(private readonly baseUrl: string) {}
 
   private async get(params?: VmixParams): Promise<string> {
@@ -90,6 +93,13 @@ export class VmixClient {
   }
 
   async call(params: VmixParams): Promise<void> {
-    await this.get(params);
+    const started = Date.now();
+    try {
+      await this.get(params);
+      this.onCall?.(params, Date.now() - started);
+    } catch (e) {
+      this.onCall?.(params, Date.now() - started, e);
+      throw e;
+    }
   }
 }
