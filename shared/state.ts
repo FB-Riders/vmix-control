@@ -23,6 +23,9 @@ export interface ReplayEntry {
   type: string;
   cams: string[];
   highlight: boolean; // has a copy in vMix's highlight tab
+  seconds: number; // current length
+  inShift: number; // seconds the start was moved since marking, negative = earlier
+  outShift: number; // seconds the end was moved since marking
   locked: boolean; // always a highlight (e.g. goals), the star cannot be removed
   playing: boolean;
 }

@@ -114,7 +114,7 @@ export class Panel {
     try { saved = JSON.parse(fs.readFileSync(this.dataFile, 'utf8')) as Persisted; } catch { /* first start */ }
     const sameDay = saved.day === today();
     const { replay } = cfg;
-    this.book = new ReplayBook((params) => vmix.call(params), replay.periods.map((p) => p.tab), replay.highlightTab, sameDay ? saved.book : undefined);
+    this.book = new ReplayBook((params) => vmix.call(params), replay.periods.map((p) => p.tab), replay.highlightTab, replay.seconds, sameDay ? saved.book : undefined);
     this.periodManual = sameDay ? saved.periodManual ?? null : null; // like the book, only valid for the day it was set
     const s = sameDay ? saved.schedule : undefined;
     this.schedule = s?.anchors && cfg.schedules.some((x) => x.id === s.id) ? s : { id: cfg.schedules[0].id, anchors: {}, rounds: {} };
@@ -454,7 +454,7 @@ export class Panel {
     if (!hv) return null;
     const scenes = this.book.highlights();
     const goals = scenes.filter((r) => this.cfg.replay.autoHighlightTypes.includes(r.type)).length;
-    const sceneSec = Math.round(scenes.reduce((sum, r) => sum + this.cfg.replay.seconds * r.cams.length, 0) / (this.video.speed / 100));
+    const sceneSec = Math.round(scenes.reduce((sum, r) => sum + this.book.length(r) * r.cams.length, 0) / (this.video.speed / 100));
     const timeline = hv.template.map((t) => ('input' in t
       ? { title: t.title, note: t.required ? 'fest, Pflicht' : 'fest', seconds: this.clipSeconds(t), required: t.required }
       : { title: `${scenes.length} Szenen aus der Playlist`, note: `${goals} Tore + ${scenes.length - goals} ★`, seconds: sceneSec, required: false }));
@@ -528,6 +528,7 @@ export class Panel {
         list: this.book.all().map((r) => ({
           id: r.id, time: r.time, period: r.period, type: r.type, cams: r.cams,
           highlight: this.book.isHighlight(r.id),
+          seconds: this.book.length(r), inShift: r.inShift, outShift: r.outShift,
           locked: cfg.replay.autoHighlightTypes.includes(r.type),
           playing: this.playing?.id === r.id,
         })),
@@ -889,7 +890,7 @@ export class Panel {
     await this.book.playTab(tab, replay.channel);
     // The scenes need at least their own length: seconds per camera angle, slower at reduced speed.
     // The floor is half that estimate: enough to rule out an early end, without holding on if vMix plays faster.
-    const minMs = this.book.inTab(tab).reduce((sum, r) => sum + replay.seconds * r.cams.length, 0) * 500 / speed;
+    const minMs = this.book.inTab(tab).reduce((sum, r) => sum + this.book.length(r) * r.cams.length, 0) * 500 / speed;
     this.playing = { id: null, since: Date.now(), seen: false, minUntil: Date.now() + minMs, offSince: 0 };
     return true;
   }
@@ -1009,6 +1010,16 @@ export class Panel {
       if (!wanted.length) throw new PanelError('Ein Replay braucht mindestens eine Kamera');
       await this.book.setCamera(r, this.cam(cam).replayCamera, on, this.cfg.cams.map((c) => c.id).filter((c) => wanted.includes(c)));
       this.persist();
+    },
+
+    'replay/trim': async ({ id, in: inSeconds, out: outSeconds }) => {
+      const r = this.entry(id);
+      if (this.book.length(r) + outSeconds - inSeconds < 1) throw new PanelError('Ein Replay muss mindestens 1 Sekunde lang sein');
+      try {
+        await this.book.trim(r, inSeconds, outSeconds, this.cfg.replay.fps);
+      } finally {
+        this.persist();
+      }
     },
 
     'replay/fav': async ({ id, fav }) => {

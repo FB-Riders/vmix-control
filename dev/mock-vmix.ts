@@ -83,7 +83,7 @@ function exec(fn: string, q: URLSearchParams): boolean {
   else if (/^(Start|Stop)Streaming$/.test(fn)) s.streaming = fn.startsWith('Start');
   else if (/^(Start|Stop)Recording$/.test(fn)) s.recording = fn.startsWith('Start');
   else if (/^Replay(Start|Stop)Recording$/.test(fn)) s.replayRec = fn.includes('Start');
-  else if (!/^Replay((Last|Selected)Event(SingleCameraOn|CameraOn|CameraOff)|Set(Last|Selected)EventText|Select(Last|Previous)Event|Copy(Last|Selected)Event|Delete(Last|Selected)Event|Play(Last|Selected)Event|SelectEvents\d+|SetSpeed)$/.test(fn)) return false;
+  else if (!/^Replay((Last|Selected)Event(SingleCameraOn|CameraOn|CameraOff)|Set(Last|Selected)EventText|Select(Last|Previous)Event|Copy(Last|Selected)Event|Delete(Last|Selected)Event|MoveSelected(In|Out)Point|Play(Last|Selected)Event|SelectEvents\d+|SetSpeed)$/.test(fn)) return false;
   return true;
 }
 

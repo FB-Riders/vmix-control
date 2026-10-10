@@ -9,6 +9,8 @@ export const actionSchemas = {
   'replay/type': z.object({ id: z.number().int(), type: z.string() }),
   'replay/cam': z.object({ id: z.number().int(), cam: z.string(), on: z.boolean() }),
   'replay/fav': z.object({ id: z.number().int(), fav: z.boolean() }),
+  // Moves the start (in) and the end (out) of a scene by seconds; negative = earlier. The same value for both shifts it.
+  'replay/trim': z.object({ id: z.number().int(), in: z.number().min(-60).max(60), out: z.number().min(-60).max(60) }),
   'replay/play': z.object({ id: z.number().int() }),
   'replay/preview': z.object({ id: z.number().int() }),
   'replay/delete': z.object({ id: z.number().int() }),

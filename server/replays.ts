@@ -9,6 +9,9 @@ export interface Scene {
   cams: string[];
   type: string;
   fav: boolean; // starred by the operator
+  seconds: number; // length when it was marked
+  inShift: number; // seconds the in point was moved since then, negative = earlier
+  outShift: number; // seconds the out point was moved since then
 }
 
 export interface ReplayBookData {
@@ -36,10 +39,12 @@ export class ReplayBook {
     private readonly call: Call,
     private readonly periodTabs: number[],
     private readonly highlightTab: number,
+    defaultSeconds: number,
     data?: ReplayBookData,
   ) {
     if (data?.tabs) {
-      this.scenes = data.scenes;
+      // Scenes saved before in and out points could be moved have no length yet.
+      this.scenes = data.scenes.map((s) => ({ ...s, seconds: s.seconds ?? defaultSeconds, inShift: s.inShift ?? 0, outShift: s.outShift ?? 0 }));
       this.nextId = data.nextId;
       for (const [tab, ids] of Object.entries(data.tabs)) this.tabs[Number(tab)] = ids;
     }
@@ -67,6 +72,9 @@ export class ReplayBook {
   count(tab: number): number { return this.tabs[tab]?.length ?? 0; }
   isHighlight(id: number): boolean { return !!this.tabs[this.highlightTab]?.includes(id); }
 
+  /** Current length of a scene in seconds. */
+  length(scene: Scene): number { return scene.seconds + scene.outShift - scene.inShift; }
+
   /** Scenes of a tab in the order vMix plays them. */
   inTab(tab: number): Scene[] {
     return (this.tabs[tab] ?? []).flatMap((id) => this.find(id) ?? []);
@@ -93,19 +101,28 @@ export class ReplayBook {
     await this.call({ Function: selectedFn, Value: value });
   }
 
+  /** Makes one scene's event the selected one in its tab, for functions that only exist for the selected event. */
+  private async select(tab: number, id: number): Promise<void> {
+    const ids = this.tabs[tab] ?? [];
+    if (!ids.includes(id)) throw new PanelError(`Replay ist laut Regie nicht in vMix-Tab ${tab}. «Neues Spiel» gleicht die Liste neu ab.`);
+    await this.show(tab);
+    await this.call({ Function: 'ReplaySelectLastEvent' });
+    for (let i = ids.length - 1 - ids.indexOf(id); i > 0; i--) await this.call({ Function: 'ReplaySelectPreviousEvent' });
+  }
+
   /** Every tab that holds the scene: its period tab, and the highlight tab if it was copied there. */
   private tabsOf(scene: Scene): number[] {
     return [this.tabOf(scene.period), ...(this.isHighlight(scene.id) ? [this.highlightTab] : [])];
   }
 
   /** Creates an event of the last `seconds` in the period's tab, with the given replay cameras. */
-  async mark(period: number, seconds: number, cameras: number[], scene: Omit<Scene, 'id' | 'period'>): Promise<Scene> {
+  async mark(period: number, seconds: number, cameras: number[], scene: Omit<Scene, 'id' | 'period' | 'seconds' | 'inShift' | 'outShift'>): Promise<Scene> {
     const tab = this.tabOf(period);
     await this.show(tab);
     await this.call({ Function: 'ReplayMarkInOutLive', Value: seconds });
     // From here on the event exists in vMix, so it goes into the book at once: if a later call fails, the positions
     // of all other scenes in the tab are still right.
-    const created: Scene = { ...scene, id: this.nextId++, period };
+    const created: Scene = { ...scene, id: this.nextId++, period, seconds, inShift: 0, outShift: 0 };
     this.scenes.push(created);
     this.tabs[tab] = [...(this.tabs[tab] ?? []), created.id];
     await this.call({ Function: 'ReplayLastEventSingleCameraOn', Value: cameras[0] });
@@ -123,6 +140,21 @@ export class ReplayBook {
     const [last, selected] = on ? ['ReplayLastEventCameraOn', 'ReplaySelectedEventCameraOn'] : ['ReplayLastEventCameraOff', 'ReplaySelectedEventCameraOff'];
     for (const tab of this.tabsOf(scene)) await this.on(tab, scene.id, last, selected, camera);
     scene.cams = cams;
+  }
+
+  /**
+   * Moves the in and the out point by seconds (negative = earlier), in the period tab and in the highlight copy.
+   * The point that leads goes first, so the in point never passes the out point on the way.
+   */
+  async trim(scene: Scene, inSeconds: number, outSeconds: number, fps: number): Promise<void> {
+    const moves: [string, number][] = [['ReplayMoveSelectedInPoint', inSeconds], ['ReplayMoveSelectedOutPoint', outSeconds]];
+    if (inSeconds > 0) moves.reverse(); // moving later: out first
+    for (const tab of this.tabsOf(scene)) {
+      await this.select(tab, scene.id);
+      for (const [fn, seconds] of moves) if (seconds) await this.call({ Function: fn, Value: Math.round(seconds * fps) });
+    }
+    scene.inShift += inSeconds;
+    scene.outShift += outSeconds;
   }
 
   /** Copies the scene into the highlight tab, or deletes that copy again. */

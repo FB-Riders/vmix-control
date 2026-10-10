@@ -97,6 +97,7 @@ ends up in vMix's recording folder. Clip lengths come from vMix, the scene lengt
 | `cams[].input` | vMix input name (or number / GUID) of each camera. Anywhere an input is named, `Name*` matches by prefix, which is needed for list inputs whose title includes the current item. `replayCamera` is its camera number 1–8 in vMix Replay. vMix plays the angles of an event in that order, so the camera that should come first needs the lowest number. |
 | `scoreboard` | Title input and its field names for score, period, clock and team names. `overlay` is the overlay channel it runs on. Remove the block if there is none. |
 | `replay.seconds` | Length of a marked replay (seconds back from live). |
+| `replay.fps` | Frame rate of the vMix project. In and out points are moved in frames, so one second is this many. |
 | `replay.marks` | The mark buttons and which cameras each one keeps in the event. |
 | `replay.periods` | One vMix Replay event tab per period (`label`, `short`, `tab`). New scenes are created in the tab of the current period. |
 | `replay.highlightTab` | Event tab that holds copies of all highlights; the highlight video and the end-of-game clip play it. |
@@ -133,6 +134,7 @@ and the panel's replay list (also needed after a test run on match day).
 | Replay PLAY | `ReplayPlayLastEventToOutput`, or select + `ReplayPlaySelectedEventToOutput` for older ones (transition/stinger comes from vMix's replay settings). Events are addressed by how many were marked after them, so create replay events only through the panel. |
 | Replay preview (eye button) | `PreviewInput` on the replay input, then `ReplayPlayLastEvent` / `ReplayPlaySelectedEvent`. Refused while the replay is on air. |
 | Replay delete | `ReplayDeleteLastEvent` / `ReplayDeleteSelectedEvent`. A copy already in the highlight list stays there. |
+| Replay timing | `ReplayMoveSelectedInPoint` / `ReplayMoveSelectedOutPoint`, in frames (`replay.fps`, default 50), on the original and its highlight copy. Locked, both move together and the length stays; unlocked, start and end move on their own. |
 | ★ / goals | Copy into the highlight tab at once (`ReplayCopy…Event`, target tab counted from 0); removing the star deletes that copy again. Type and camera changes are applied to the original and the copy. |
 | Break clip / end clip | `ReplaySelectEventsN` + `ReplayPlayAllEventsToOutput` on the period's tab resp. the highlight tab, with all overlays off and the highlight music. |
 | Highlight video | `StartRecording`, per clip `Restart` + `CutDirect` + `Play`, `ReplaySetSpeed` + highlights, `StopRecording` |

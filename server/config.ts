@@ -58,6 +58,7 @@ const configSchema = z.object({
   }).optional(),
   replay: z.object({
     seconds: z.number().positive(),
+    fps: z.number().positive().default(50), // vMix moves in and out points by frames
     channel: z.string().default(''),
     // vMix Replay event tabs: one per period for the marked scenes, one for the highlights (copies of starred scenes).
     periods: z.array(z.object({ label: z.string(), short: z.string(), tab: z.number().int().min(1).max(20) })).min(1).default([
