@@ -101,6 +101,7 @@ export class Panel {
   private soundApplied = ''; // the sound state last sent to vMix
   private readonly debugLog: DebugEntry[] = []; // actions, vMix calls, sound direction and sequences, oldest first
   private pollMs = 0; // how long the last state request to vMix took
+  private trailerHidden: { channel: number; input: string }[] = []; // league logos taken off while the league trailer runs
   private holdOverlays = false; // overlays stay off beyond the highlight scenes: whole highlight video, whole break
   private readonly sponsors: Sponsors | null;
   private readonly board: ManualScoreboard | null; // match clock by hand, in place of the scoreboard link
@@ -269,6 +270,7 @@ export class Panel {
         // No sponsor over a replay, the highlights or the break.
         this.sponsors.tick(now, !!this.playing || this.holdOverlays, sp.inputs.some((i) => this.findInput(i)?.number === onChannel));
       }
+      this.trailerLogos().catch(() => {});
       if (this.shootout) {
         this.shootout.sync(now, this.findInput(this.shootout.input)?.number === this.vm.overlays[this.cfg.scoreboard?.overlay ?? 1]);
         if (this.shootout.live) this.shootout.facts(this.shootoutFacts()).catch(() => {}); // the score follows the scoreboard
@@ -308,7 +310,8 @@ export class Panel {
     const sources = this.audioSources();
     return {
       now,
-      logosVisible: this.cfg.logos.length ? this.logoStates().every((l) => l.visible) : null,
+      // Off for the league trailer is as the league wants it, so it counts as on.
+      logosVisible: this.cfg.logos.length ? this.trailerHidden.length > 0 || this.logoStates().every((l) => l.visible) : null,
       audioPaused: sources.length > 0 && sources.every((s) => !s.on),
       schedule: this.schedule.id,
       round: this.schedule.rounds[this.schedule.id] ?? 0,
@@ -498,7 +501,7 @@ export class Panel {
     const channels = new Set([...roles.keys(), ...Object.entries(vm?.overlays ?? {}).filter(([, n]) => n).map(([ch]) => Number(ch))]);
     return [...channels].sort((a, b) => a - b).map((channel) => {
       const number = vm?.overlays[channel] ?? 0;
-      const hidden = this.hiddenOverlays.find((o) => o.channel === channel)?.input ?? (channel === clock ? this.clockHidden : null);
+      const hidden = [...this.hiddenOverlays, ...this.trailerHidden].find((o) => o.channel === channel)?.input ?? (channel === clock ? this.clockHidden : null);
       return {
         channel, role: roles.get(channel) ?? '', on: !!number,
         text: number ? name(channel, number) : hidden ? name(channel, hidden) : '',
@@ -707,7 +710,7 @@ export class Panel {
         alerts: [
           ...(this.notice ? [this.notice.text] : []),
           ...(vm?.streaming && !this.replayRecording() ? ['Replay-Aufnahme läuft nicht: keine Replays möglich'] : []),
-          ...(vm ? this.monitor.alerts(this.hiddenOverlays.length || this.holdOverlays ? { ...ctx, logosVisible: null } : ctx) : []),
+          ...(vm ? this.monitor.alerts(this.video.status === 'running' ? { ...ctx, logosVisible: null } : ctx) : []),
         ],
         loudness: vm?.streaming || sources.some((s) => s.on) ? this.monitor.loudness() : null,
         loudnessTarget: cfg.audio?.loudnessTarget ?? -16,
@@ -909,6 +912,24 @@ export class Panel {
     }
   }
 
+  /** The one exception to "logos always on": while a `logosOffFor` input (the league trailer) is on program they go off, and come back after it. */
+  private async trailerLogos(): Promise<void> {
+    const active = this.activeInput();
+    const trailer = !!active && this.cfg.logosOffFor.some((i) => this.findInput(i) === active);
+    if (trailer && !this.trailerHidden.length) {
+      const on = this.cfg.logos.flatMap((l) => {
+        const inp = this.findInput(l.input);
+        return inp && this.vm?.overlays[l.overlay] === inp.number ? [{ channel: l.overlay, input: inp.key }] : [];
+      });
+      this.trailerHidden = on;
+      for (const o of on) await this.vmix.call({ Function: `OverlayInput${o.channel}Out` });
+    } else if (!trailer && this.trailerHidden.length) {
+      const back = this.trailerHidden;
+      this.trailerHidden = [];
+      for (const o of back) await this.vmix.call({ Function: `OverlayInput${o.channel}In`, Input: o.input });
+    }
+  }
+
   private needSponsors(): Sponsors {
     if (!this.sponsors) throw new PanelError('Kein Sponsor-Input konfiguriert');
     return this.sponsors;
@@ -924,11 +945,14 @@ export class Panel {
     this.clockHidden = inp.key;
   }
 
-  /** Highlights run clean: every overlay channel, league logos included, goes off and comes back afterwards. */
-  private async hideOverlays(): Promise<void> {
+  /**
+   * Highlights and the break run without clock, graphics and sponsors; they come back afterwards. The league logos
+   * stay: they have to be on for the whole broadcast. `all` takes them off too (the highlight video is not broadcast).
+   */
+  private async hideOverlays(all = false): Promise<void> {
     for (const [channel, number] of Object.entries(this.vm?.overlays ?? {})) {
       const input = this.vm?.inputs.find((i) => i.number === number);
-      if (!input) continue;
+      if (!input || (!all && this.cfg.logos.some((l) => l.overlay === Number(channel)))) continue;
       await this.vmix.call({ Function: `OverlayInput${channel}Out` });
       this.hiddenOverlays.push({ channel: Number(channel), input: input.key });
     }
@@ -1065,7 +1089,7 @@ export class Panel {
       await this.exclusive(async () => {
         await this.setAudio(false).catch(() => {}); // no open microphones in the video
         this.holdOverlays = true;
-        await this.hideOverlays(); // no graphics over any part of the video, fixed clips included
+        await this.hideOverlays(true); // no graphics over any part of the video, fixed clips included
         await this.vmix.call({ Function: 'StartRecording' });
       });
       await sleep(1000);

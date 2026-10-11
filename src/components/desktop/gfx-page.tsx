@@ -331,7 +331,7 @@ export function GfxPage({ state, embedded }: { state: PanelState; embedded?: boo
               </Button>
             )}
           >
-            <span className="text-xs font-light text-muted-foreground">Müssen während des ganzen Spiels im Bild sein. Für Highlights und Pause nimmt sie das Panel selbst weg und bringt sie zurück.</span>
+            <span className="text-xs font-light text-muted-foreground">Müssen während der ganzen Übertragung im Bild sein: auch im Vorlauf, in den Pausen, bei Interviews und über Werbung. Nur für den Liga-Trailer nimmt sie das Panel weg und bringt sie danach zurück.</span>
           </Group>
         )}
 

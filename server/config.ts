@@ -109,6 +109,8 @@ const configSchema = z.object({
     order: z.array(z.number().int().positive()).default([]), // rotation as positions in `list`, from 1; empty = as listed
   }).optional(),
   logos: z.array(z.object({ name: z.string(), input: z.string(), overlay: z.number().int().min(1).max(8) })).default([]),
+  // The league wants its logos on for the whole broadcast. Only these inputs run without them (the official league trailer).
+  logosOffFor: z.array(z.string()).default([]),
   // On-screen graphics from the game config, shown through the league's vMix titles.
   graphics: z.object({
     overlay: z.number().int().min(1).max(8).default(2),
