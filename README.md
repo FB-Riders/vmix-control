@@ -58,8 +58,16 @@ overlay channel, one at a time:
 | Goal, penalty | `playerEvent` | current score or penalty length, number, name |
 | Name, best player | `playerName` | number, name |
 | Line-up | `lineupHome` / `lineupAway` | `Line1`–`Line4`, `Goal`, coach |
+| Match clock by hand | `scoreboard.input` | not from the game config: see below |
 | Penalty shoot-out | `graphics.shootout.input` | not from the game config: five circles per team, coloured per attempt (`colors.goal` / `miss` / `open`); goes on the match clock's overlay channel in its place, names and score copied from the clock title |
 | Starting six | `startingSix` | first goalie and first line; fades in with the team logo, then the stepper brings on one player at a time (the title's animation pages `Page1`–`Page6`) |
+
+**Match clock by hand.** Normally the hall's scoreboard fills the clock title. If that link fails, the switch
+"Matchuhr von Hand" on the Einblender screen hands the title to the panel: it carries on from the time, period and
+score the title shows, and from then on writes game time (counts up, stops at `scoreboard.manual.periodMinutes`),
+period, score and two penalties per team (they run with the game time and vanish at 00:00). `+1` leaves the clock running;
+set `stopOnGoal` to `true` to have a goal stop it. Switched off, the panel writes nothing into the title any more. Do not run both at once: if the
+scoreboard link still writes, the two overwrite each other.
 
 Goal, penalty, name and best player graphics go off by themselves after 8 s (`graphics.autoHideSec`, kind → seconds;
 add e.g. `"timeout": 8`, or remove an entry to keep that graphic on). All others stay until AUSBLENDEN.

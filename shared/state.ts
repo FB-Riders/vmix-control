@@ -162,6 +162,19 @@ export interface GfxTeam {
   startingSix: GfxPlayer[]; // first goalie and first line
 }
 
+/** The match clock driven by hand instead of by the hall's scoreboard. */
+export interface ManualScoreboardState {
+  manual: boolean; // false: the scoreboard link fills the clock title
+  onAir: boolean; // the clock is on its overlay channel
+  runningSince: number | null; // server time the clock was started; null = it stands still
+  elapsedMs: number; // game time as of runningSince (or now, if it stands still)
+  limitMs: number; // the clock stops by itself here
+  period: string;
+  periods: string[];
+  score: { home: number; away: number };
+  penalties: { home: number[]; away: number[] }; // remaining ms per slot as of runningSince, 0 = free
+}
+
 export type Shot = 'goal' | 'miss';
 
 /** Penalty shoot-out display. `row` = the circles of the current round, `goals` / `attempts` = the whole shoot-out. */
@@ -200,6 +213,7 @@ export interface PanelState {
   audio: AudioState | null;
   music: { name: string; track: string; playing: boolean } | null; // background music input
   gfx: GfxState | null; // null if no graphics are configured
+  scoreboard: ManualScoreboardState | null; // null if no match clock is configured
   shootout: ShootoutState | null; // null if no shoot-out title is configured
   breakSound: { music: boolean } | null; // break video: its own sound, or muted with the background music over it
   sponsor: SponsorState | null;

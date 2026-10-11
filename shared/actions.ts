@@ -54,6 +54,18 @@ export const actionSchemas = {
   'gfx/show': gfxRequest,
   'gfx/next': z.object({}), // starting six: next player
   'gfx/hide': z.object({}),
+  // Match clock by hand, when the link to the hall's scoreboard fails.
+  'scoreboard/mode': z.object({ manual: z.boolean() }),
+  'scoreboard/show': z.object({ on: z.boolean() }), // clock on or off its overlay channel
+  'scoreboard/run': z.object({ on: z.boolean() }),
+  'scoreboard/adjust': z.object({ seconds: z.number().int().min(-600).max(600) }),
+  'scoreboard/time': z.object({ seconds: z.number().int().min(0).max(6000) }),
+  'scoreboard/period': z.object({ period: z.string() }),
+  'scoreboard/goal': z.object({ team: z.enum(['home', 'away']), delta: z.union([z.literal(1), z.literal(-1)]) }),
+  'scoreboard/penalty': z.object({ team: z.enum(['home', 'away']), slot: z.number().int().min(1).max(2), seconds: z.number().int().min(0).max(1200) }),
+  // A penalty of the given kind (as on the penalty buttons, e.g. "2'") on the clock, without a graphic.
+  'scoreboard/addPenalty': z.object({ team: z.enum(['home', 'away']), label: z.string() }),
+  'scoreboard/reset': z.object({}),
   // Penalty shoot-out display in place of the match clock.
   'shootout/show': z.object({ on: z.boolean() }),
   'shootout/shot': z.object({ team: z.enum(['home', 'away']), result: z.enum(['goal', 'miss']) }),

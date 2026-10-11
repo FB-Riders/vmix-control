@@ -8,6 +8,7 @@ import { PanelError } from './errors';
 import { Graphics, parseIni } from './graphics';
 import { emptyLog, type MatchLog, Monitor, type MonitorContext } from './monitor';
 import { ReplayBook, type ReplayBookData, type Scene } from './replays';
+import { ManualScoreboard, type ManualScoreboardData } from './scoreboard';
 import { Shootout, type ShootoutFacts } from './shootout';
 import { parseSponsors, type SponsorSet, Sponsors } from './sponsors';
 import { type VmixClient, VmixError, type VmixInput, type VmixState } from './vmix';
@@ -27,6 +28,7 @@ interface Persisted {
   periodManual?: number | null;
   gameConfig?: string; // the TCunihockey game config as it was imported
   sponsors?: SponsorSet; // from an imported TCunihockey system config
+  scoreboard?: ManualScoreboardData; // the match clock driven by hand
   periodScores?: { home: number; away: number }[];
   schedule?: ScheduleStore;
   ticks?: Record<string, boolean>;
@@ -101,6 +103,7 @@ export class Panel {
   private pollMs = 0; // how long the last state request to vMix took
   private holdOverlays = false; // overlays stay off beyond the highlight scenes: whole highlight video, whole break
   private readonly sponsors: Sponsors | null;
+  private readonly board: ManualScoreboard | null; // match clock by hand, in place of the scoreboard link
   private readonly shootout: Shootout | null; // penalty shoot-out display in place of the match clock
   private sponsorSet: SponsorSet | null = null; // as imported, to have it again after a restart
   private schedule: ScheduleStore;
@@ -129,6 +132,8 @@ export class Panel {
     this.book = new ReplayBook((params) => vmix.call(params), replay.periods.map((p) => p.tab), replay.highlightTab, replay.seconds, sameDay ? saved.book : undefined);
     this.periodManual = sameDay ? saved.periodManual ?? null : null;
     this.gfx = cfg.graphics ? new Graphics(cfg.graphics, (params) => vmix.call(params), (input) => this.ref(input)) : null;
+    const sb = cfg.scoreboard;
+    this.board = sb ? new ManualScoreboard({ input: sb.input, ...sb.manual }, (params) => vmix.call(params), (input) => this.ref(input), () => this.persist(), sameDay ? saved.scoreboard : undefined) : null;
     const so = cfg.graphics?.shootout;
     this.shootout = so ? new Shootout({ ...so, overlay: cfg.scoreboard?.overlay ?? 1 }, (params) => vmix.call(params), (input) => this.ref(input)) : null;
     this.sponsorSet = saved.sponsors ?? null;
@@ -157,6 +162,8 @@ export class Panel {
   start(pollMs: number): void {
     setInterval(() => void this.poll(), pollMs);
     setInterval(() => this.broadcast(true), 15000); // keeps client clocks in sync and connections alive
+    // The clock by hand needs a finer beat than the poll, or its seconds would stumble.
+    setInterval(() => { if (this.vm) this.pushScoreboard(); }, 100);
   }
 
   subscribe(fn: (state: PanelState) => void): () => void {
@@ -338,12 +345,14 @@ export class Panel {
   private score(): Score | null {
     const sb = this.cfg.scoreboard;
     const inp = sb && this.findInput(sb.input);
-    if (!sb || !inp) return null;
-    const f = (name: string) => (name ? inp.fields[name]?.trim() ?? '' : '');
+    // By hand the panel knows score and period itself; reading them back from the title would only add a way to fail.
+    const b = this.board?.manual ? this.board : null;
+    if (!sb || (!inp && !b)) return null;
+    const f = (name: string) => (name ? inp?.fields[name]?.trim() ?? '' : '');
     const names = [f(sb.homeName), f(sb.awayName)];
-    const period = f(sb.period);
+    const period = b ? b.period : f(sb.period);
     const clock = [sb.clock].flat().map(f).join('');
-    return { home: f(sb.home), away: f(sb.away), period: period && sb.periodFormat.replace('{}', period), clock, teams: names.every(Boolean) ? names.join(' – ') : '' };
+    return { home: b ? String(b.score.home) : f(sb.home), away: b ? String(b.score.away) : f(sb.away), period: period && sb.periodFormat.replace('{}', period), clock, teams: names.every(Boolean) ? names.join(' – ') : '' };
   }
 
   /** Names and score for the shoot-out display: as on the match clock, else from the game config. */
@@ -357,6 +366,25 @@ export class Panel {
       homeScore: f(sb?.home), awayScore: f(sb?.away),
       homeLogo: teams?.home.logo ?? '', awayLogo: teams?.away.logo ?? '',
     };
+  }
+
+  private pushScoreboard(): void {
+    const b = this.board;
+    if (!b?.manual) return;
+    const teams = this.gfx?.teams();
+    b.names = { home: teams?.home.short ?? '', away: teams?.away.short ?? '' };
+    b.push().catch(() => {});
+  }
+
+  private needBoard(): ManualScoreboard {
+    if (!this.board) throw new PanelError('In config.json ist keine Matchuhr hinterlegt (scoreboard)');
+    return this.board;
+  }
+
+  private clockOnAir(): boolean {
+    const sb = this.cfg.scoreboard;
+    const inp = this.findInput(sb?.input);
+    return !!inp && !!sb && this.vm?.overlays[sb.overlay ?? 1] === inp.number;
   }
 
   private needShootout(): Shootout {
@@ -399,7 +427,7 @@ export class Panel {
   /** Period shown on the scoreboard as an index into the configured periods; anything that is not 1, 2, 3 ... counts as the last (overtime). */
   private scoreboardPeriod(): number | null {
     const sb = this.cfg.scoreboard;
-    const raw = sb?.period ? this.findInput(sb.input)?.fields[sb.period]?.trim() : '';
+    const raw = this.board?.manual ? this.board.period : sb?.period ? this.findInput(sb.input)?.fields[sb.period]?.trim() : '';
     if (!raw) return null;
     const last = this.cfg.replay.periods.length - 1;
     return /^\d+$/.test(raw) ? Math.min(Math.max(Number(raw) - 1, 0), last) : last;
@@ -633,6 +661,7 @@ export class Panel {
         : null,
       music: this.musicState(),
       gfx: this.gfx ? this.gfx.view(this.scoreText(), this.periodResults()) : null,
+      scoreboard: this.board ? { ...this.board.view(), onAir: this.clockOnAir() } : null,
       shootout: this.shootout?.view() ?? null,
       breakSound: cfg.audio?.music && cfg.audio.breakVideo ? { music: this.breakMusic } : null,
       sponsor: this.sponsors && cfg.sponsor?.inputs.length ? this.sponsors.view() : null,
@@ -687,7 +716,7 @@ export class Panel {
   }
 
   private persist(): void {
-    const data: Persisted = { day: today(), book: this.book.toJSON(), periodManual: this.periodManual, gameConfig: this.gameConfig, sponsors: this.sponsorSet ?? undefined, periodScores: this.periodScores, schedule: this.schedule, ticks: this.ticks, log: this.monitor.log, recordGame: this.recordGame, breakMusic: this.breakMusic };
+    const data: Persisted = { day: today(), book: this.book.toJSON(), periodManual: this.periodManual, gameConfig: this.gameConfig, sponsors: this.sponsorSet ?? undefined, scoreboard: this.board?.toJSON(), periodScores: this.periodScores, schedule: this.schedule, ticks: this.ticks, log: this.monitor.log, recordGame: this.recordGame, breakMusic: this.breakMusic };
     this.monitor.dirty = false;
     this.lastSaved = Date.now();
     fs.mkdirSync(path.dirname(this.dataFile), { recursive: true });
@@ -752,7 +781,12 @@ export class Panel {
   private async showGraphic(req: GfxRequest | 'hide'): Promise<void> {
     if (!this.gfx) throw new PanelError('In config.json sind keine Einblender (graphics) hinterlegt');
     if (req === 'hide') { await this.gfx.hide(); return; }
-    const s = this.scoreText();
+    // Clock by hand: one press does it all. A goal counts, a penalty starts on the clock.
+    const b = this.board?.manual ? this.board : null;
+    if (b && req.team && req.kind === 'goal') b.goal(req.team, 1);
+    if (b && req.team && req.kind === 'penalty' && req.value) b.addPenalty(req.team, req.value);
+    if (b) this.pushScoreboard();
+    const s = b ? { home: String(b.score.home), away: String(b.score.away) } : this.scoreText();
     await this.gfx.show(req, s ? `${s.home}:${s.away}` : '', this.periodResults());
   }
 
@@ -1311,6 +1345,32 @@ export class Panel {
 
     'gfx/next': async () => { await this.gfx?.next(); },
     'gfx/hide': async () => { await this.showGraphic('hide'); },
+
+    'scoreboard/mode': async ({ manual }) => {
+      // Taking over mid-game: start from what the scoreboard link last wrote into the title.
+      const sb = this.cfg.scoreboard;
+      const fields = (sb && this.findInput(sb.input)?.fields) || {};
+      const time = [sb?.clock ?? []].flat().map((f) => fields[f] ?? '').join('').match(/^(\d{1,2}):(\d{2})$/);
+      const score = this.scoreNumbers();
+      this.needBoard().setMode(manual, {
+        seconds: time ? Number(time[1]) * 60 + Number(time[2]) : undefined,
+        period: sb?.period ? fields[sb.period]?.trim() : undefined,
+        home: score?.home, away: score?.away,
+      });
+    },
+    'scoreboard/show': async ({ on }) => {
+      const sb = this.cfg.scoreboard;
+      if (!sb) throw new PanelError('In config.json ist keine Matchuhr hinterlegt (scoreboard)');
+      await this.vmix.call(on ? { Function: `OverlayInput${sb.overlay ?? 1}In`, Input: this.ref(sb.input) } : { Function: `OverlayInput${sb.overlay ?? 1}Out` });
+    },
+    'scoreboard/run': async ({ on }) => { this.needBoard().run(on); },
+    'scoreboard/adjust': async ({ seconds }) => { this.needBoard().adjust(seconds); },
+    'scoreboard/time': async ({ seconds }) => { this.needBoard().setTime(seconds); },
+    'scoreboard/period': async ({ period }) => { this.needBoard().setPeriod(period); },
+    'scoreboard/goal': async ({ team, delta }) => { this.needBoard().goal(team, delta); },
+    'scoreboard/penalty': async ({ team, slot, seconds }) => { this.needBoard().penalty(team, slot, seconds); },
+    'scoreboard/addPenalty': async ({ team, label }) => { this.needBoard().startPenalty(team, label); },
+    'scoreboard/reset': async () => { this.needBoard().reset(); },
 
     'shootout/show': async ({ on }) => {
       const so = this.needShootout();
