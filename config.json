@@ -150,8 +150,10 @@
       "LUPL-SU_sponsor.gtzip"
     ],
     "overlay": 3,
-    "intervalSec": 180,
-    "durationSec": 10
+    "intervalSec": 178,
+    "durationSec": 8,
+    "list": [],
+    "order": []
   },
   "logos": [
     {

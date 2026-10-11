@@ -57,6 +57,10 @@ export interface SponsorState {
   activeUntil: number;
   intervalSec: number;
   durationSec: number;
+  live: number | null; // number of the sponsor on screen; 0 = the sponsor input as it is in vMix
+  next: number | null; // the sponsor the rotation shows next
+  list: { nr: number; label: string }[];
+  overlay: number;
 }
 
 export interface ScheduleStep {

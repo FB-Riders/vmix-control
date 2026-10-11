@@ -5,9 +5,10 @@ import type { DebugEntry, DebugInfo, DebugKind } from '../shared/debug';
 import type { ControllingItem, PanelState, ScheduleState, Score, SimState, Tick, VideoState } from '../shared/state';
 import type { Config, VmixCall } from './config';
 import { PanelError } from './errors';
-import { Graphics } from './graphics';
+import { Graphics, parseIni } from './graphics';
 import { emptyLog, type MatchLog, Monitor, type MonitorContext } from './monitor';
 import { ReplayBook, type ReplayBookData, type Scene } from './replays';
+import { parseSponsors, type SponsorSet, Sponsors } from './sponsors';
 import { type VmixClient, VmixError, type VmixInput, type VmixState } from './vmix';
 
 export { PanelError };
@@ -24,6 +25,7 @@ interface Persisted {
   book?: ReplayBookData;
   periodManual?: number | null;
   gameConfig?: string; // the TCunihockey game config as it was imported
+  sponsors?: SponsorSet; // from an imported TCunihockey system config
   periodScores?: { home: number; away: number }[];
   schedule?: ScheduleStore;
   ticks?: Record<string, boolean>;
@@ -97,7 +99,8 @@ export class Panel {
   private readonly debugLog: DebugEntry[] = []; // actions, vMix calls, sound direction and sequences, oldest first
   private pollMs = 0; // how long the last state request to vMix took
   private holdOverlays = false; // overlays stay off beyond the highlight scenes: whole highlight video, whole break
-  private sponsor = { enabled: false, nextAt: 0, activeUntil: 0, rotation: 0 };
+  private readonly sponsors: Sponsors | null;
+  private sponsorSet: SponsorSet | null = null; // as imported, to have it again after a restart
   private schedule: ScheduleStore;
   private autoRun = true;
   private recordGame: boolean; // record the game locally when the stream is started
@@ -124,6 +127,8 @@ export class Panel {
     this.book = new ReplayBook((params) => vmix.call(params), replay.periods.map((p) => p.tab), replay.highlightTab, replay.seconds, sameDay ? saved.book : undefined);
     this.periodManual = sameDay ? saved.periodManual ?? null : null;
     this.gfx = cfg.graphics ? new Graphics(cfg.graphics, (params) => vmix.call(params), (input) => this.ref(input)) : null;
+    this.sponsorSet = saved.sponsors ?? null;
+    this.sponsors = cfg.sponsor ? new Sponsors(cfg.sponsor, (params) => vmix.call(params), (input) => this.ref(input), this.sponsorSet) : null;
     if (saved.gameConfig && this.gfx) {
       try { this.gfx.load(saved.gameConfig); this.gameConfig = saved.gameConfig; } catch { /* an unreadable old config is simply not loaded */ }
     }
@@ -247,8 +252,12 @@ export class Panel {
           this.exclusive(() => this.afterPlayback()).catch(() => {});
         }
       }
-      const clean = this.playing?.id === null || this.holdOverlays; // no sponsor overlay over the highlights or the break
-      if (this.sponsor.enabled && now >= this.sponsor.nextAt && !clean) this.showSponsor().catch(() => {});
+      const sp = this.cfg.sponsor;
+      if (this.sponsors && sp) {
+        const onChannel = this.vm.overlays[sp.overlay];
+        // No sponsor over a replay, the highlights or the break.
+        this.sponsors.tick(now, !!this.playing || this.holdOverlays, sp.inputs.some((i) => this.findInput(i)?.number === onChannel));
+      }
       this.monitor.update(this.vm, this.monitorContext(now));
       this.runDueSteps(now);
       this.directSound(now);
@@ -598,9 +607,7 @@ export class Panel {
       music: this.musicState(),
       gfx: this.gfx ? this.gfx.view(this.scoreText(), this.periodResults()) : null,
       breakSound: cfg.audio?.music && cfg.audio.breakVideo ? { music: this.breakMusic } : null,
-      sponsor: cfg.sponsor?.inputs.length
-        ? { enabled: this.sponsor.enabled, nextAt: this.sponsor.nextAt, activeUntil: this.sponsor.activeUntil, intervalSec: cfg.sponsor.intervalSec, durationSec: cfg.sponsor.durationSec }
-        : null,
+      sponsor: this.sponsors && cfg.sponsor?.inputs.length ? this.sponsors.view() : null,
       logos: logos.length ? { visible: logos.every((l) => l.visible) } : null,
       health: {
         watches: this.monitor.watches(logos.length > 0),
@@ -652,7 +659,7 @@ export class Panel {
   }
 
   private persist(): void {
-    const data: Persisted = { day: today(), book: this.book.toJSON(), periodManual: this.periodManual, gameConfig: this.gameConfig, periodScores: this.periodScores, schedule: this.schedule, ticks: this.ticks, log: this.monitor.log, recordGame: this.recordGame, breakMusic: this.breakMusic };
+    const data: Persisted = { day: today(), book: this.book.toJSON(), periodManual: this.periodManual, gameConfig: this.gameConfig, sponsors: this.sponsorSet ?? undefined, periodScores: this.periodScores, schedule: this.schedule, ticks: this.ticks, log: this.monitor.log, recordGame: this.recordGame, breakMusic: this.breakMusic };
     this.monitor.dirty = false;
     this.lastSaved = Date.now();
     fs.mkdirSync(path.dirname(this.dataFile), { recursive: true });
@@ -806,18 +813,9 @@ export class Panel {
     }
   }
 
-  private async showSponsor(): Promise<void> {
-    const sp = this.cfg.sponsor;
-    if (!sp?.inputs.length) throw new PanelError('Kein Sponsor-Input konfiguriert');
-    const now = Date.now();
-    this.sponsor.nextAt = now + sp.intervalSec * 1000;
-    const input = sp.inputs[this.sponsor.rotation++ % sp.inputs.length];
-    await this.vmix.call({ Function: `OverlayInput${sp.overlay}In`, Input: this.ref(input) });
-    this.sponsor.activeUntil = now + sp.durationSec * 1000;
-    setTimeout(() => {
-      this.sponsor.activeUntil = 0;
-      this.vmix.call({ Function: `OverlayInput${sp.overlay}Out` }).catch(() => {});
-    }, sp.durationSec * 1000);
+  private needSponsors(): Sponsors {
+    if (!this.sponsors) throw new PanelError('Kein Sponsor-Input konfiguriert');
+    return this.sponsors;
   }
 
   private async hideClock(): Promise<void> {
@@ -1145,14 +1143,10 @@ export class Panel {
       // directSound() applies it within a second while the break video is the picture; otherwise it is the choice for the next break.
     },
 
-    'sponsor/now': async () => { await this.showSponsor(); },
-
-    'sponsor/auto': async ({ enabled }) => {
-      const sp = this.cfg.sponsor;
-      if (!sp?.inputs.length) throw new PanelError('Kein Sponsor-Input konfiguriert');
-      this.sponsor.enabled = enabled;
-      this.sponsor.nextAt = enabled ? Date.now() + sp.intervalSec * 1000 : 0;
-    },
+    'sponsor/now': async () => { await this.needSponsors().show(); },
+    'sponsor/show': async ({ nr }) => { await this.needSponsors().show(nr); },
+    'sponsor/hide': async () => { await this.needSponsors().hide(); },
+    'sponsor/auto': async ({ enabled }) => { this.needSponsors().setAuto(enabled); },
 
     toggle: async ({ what, on }) => {
       if (what === 'stream') await this.vmix.call({ Function: on ? 'StartStreaming' : 'StopStreaming' });
@@ -1262,10 +1256,22 @@ export class Panel {
     },
 
     'gfx/import': async ({ text }) => {
-      if (!this.gfx) throw new PanelError('In config.json sind keine Einblender (graphics) hinterlegt');
-      this.gfx.load(text);
-      this.gameConfig = text;
+      // A game config ([Home], [Away]) or TCunihockey's system config with the sponsors ([Sponsor01] ...), or both in one.
+      const sections = parseIni(text);
+      const sponsors = parseSponsors(sections);
+      const game = !!sections.home && !!sections.away;
+      if (!game && !sponsors) throw new PanelError('Weder Spiel-Konfiguration ([Home], [Away]) noch Sponsoren ([Sponsor01]) gefunden');
+      if (game) {
+        if (!this.gfx) throw new PanelError('In config.json sind keine Einblender (graphics) hinterlegt');
+        this.gfx.load(text);
+        this.gameConfig = text;
+      }
+      if (sponsors) {
+        this.needSponsors().import(sponsors);
+        this.sponsorSet = sponsors;
+      }
       this.persist();
+      return { game, sponsors: sponsors?.list.length ?? 0 };
     },
 
     'gfx/show': async (req) => {

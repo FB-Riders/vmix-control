@@ -31,7 +31,9 @@ export const actionSchemas = {
   'audio/source': z.object({ id: z.string(), on: z.boolean() }),
   music: z.object({ play: z.boolean() }),
   'break/sound': z.object({ music: z.boolean() }),
-  'sponsor/now': z.object({}),
+  'sponsor/now': z.object({}), // next sponsor of the rotation, for the configured time
+  'sponsor/show': z.object({ nr: z.number().int().positive() }), // this sponsor, until it is taken off
+  'sponsor/hide': z.object({}),
   'sponsor/auto': z.object({ enabled: z.boolean() }),
   toggle: z.object({ what: z.enum(['stream', 'rec', 'replayRec', 'logos']), on: z.boolean() }),
   'schedule/set': z.object({
@@ -67,5 +69,6 @@ export type AudioPreset = ActionInput<'audio/preset'>['preset'];
 
 interface ActionResults {
   'replay/mark': { id: number; cams: string[] };
+  'gfx/import': { game: boolean; sponsors: number }; // what the file held
 }
 export type ActionResult<K extends ActionName> = K extends keyof ActionResults ? ActionResults[K] : void;

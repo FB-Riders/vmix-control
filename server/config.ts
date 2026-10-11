@@ -92,8 +92,12 @@ const configSchema = z.object({
   sponsor: z.object({
     inputs: z.array(z.string()),
     overlay: z.number().int().min(1).max(8),
-    intervalSec: z.number().positive(),
+    intervalSec: z.number().positive(), // automatic rotation: from one fade-in to the next
     durationSec: z.number().positive(),
+    // Sponsors put into the first input (the league's sponsor title) one at a time: button label, heading above the
+    // logo, full path of the logo on the vMix computer. Empty = the inputs are shown as they are.
+    list: z.array(z.object({ label: z.string(), title: z.string().default(''), picture: z.string() })).max(8).default([]),
+    order: z.array(z.number().int().positive()).default([]), // rotation as positions in `list`, from 1; empty = as listed
   }).optional(),
   logos: z.array(z.object({ name: z.string(), input: z.string(), overlay: z.number().int().min(1).max(8) })).default([]),
   // On-screen graphics from the game config, shown through the league's vMix titles.
