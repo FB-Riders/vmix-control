@@ -4,7 +4,7 @@ import http from 'node:http';
 
 interface MockInput { title: string; type: string; text?: Record<string, string>; audio?: number; muted?: boolean; duration?: number; number: number; key: string }
 
-const inputs: MockInput[] = [
+const inputs: MockInput[] = ([
   { title: 'CAM L', type: 'Capture' },
   { title: 'CAM M', type: 'Capture', audio: 0.04 },
   { title: 'CAM R', type: 'Capture' },
@@ -14,6 +14,10 @@ const inputs: MockInput[] = [
   { title: 'Sponsor', type: 'Image' },
   { title: 'League ID', type: 'Image' },
   { title: 'LUPL-SU_league_id.gtzip', type: 'GT' },
+  { title: 'LUPL-SU_scoreboard_penaltyshooting.gtzip', type: 'GT' },
+  // As the scoreboard link leaves it: one digit per field.
+  { title: 'LUPL-SU_scoreboard_clock.gtzip', type: 'GT', text: { 'TxtHomeScore.Text': '2', 'TxtAwayScore.Text': '1', 'TxtClockPeriod.Text': '2', 'TxtClockTimeM10.Text': '0', 'TxtClockTimeM01.Text': '8', 'TxtClockTimeT.Text': ':', 'TxtClockTimeS10.Text': '3', 'TxtClockTimeS01.Text': '4', 'TxtHomeName.Text': 'RIDERS', 'TxtAwayName.Text': 'GAST' } },
+  ...['sponsor', 'board', 'league_info', 'team_info', 'team_player_event', 'team_player_name', 'team_lineup_home', 'team_lineup_away', 'team_startingsix'].map((t) => ({ title: `LUPL-SU_${t}.gtzip`, type: 'GT' })),
   { title: 'Livestream Pro', type: 'Image' },
   { title: 'Liga-Trailer', type: 'Video', duration: 60000 },
   { title: 'Liga-Trailer Short', type: 'Video', duration: 10000 },
@@ -30,7 +34,7 @@ const inputs: MockInput[] = [
   { title: 'General Music - 4. Never Be The Same.wav', type: 'VideoList', duration: 227894 },
   { title: 'Highlights - Sound - Ice and Flames.wav', type: 'AudioFile' },
   { title: 'Haupt', type: 'Capture', audio: 0.04 },
-].map((i, n) => ({ ...i, number: n + 1, key: `00000000-0000-0000-0000-${String(n + 1).padStart(12, '0')}` }));
+] as Omit<MockInput, 'number' | 'key'>[]).map((i, n) => ({ ...i, number: n + 1, key: `00000000-0000-0000-0000-${String(n + 1).padStart(12, '0')}` }));
 
 const s = { active: 2, preview: 1, streaming: false, recording: false, replayRec: true, events: 0, overlays: [0, 0, 0, 0] };
 const playingClips = new Set<number>();
@@ -71,6 +75,12 @@ function exec(fn: string, q: URLSearchParams): boolean {
   }
   else if (fn === 'AudioOn' || fn === 'AudioOff') { if (!inp) return false; inp.muted = fn === 'AudioOff'; }
   else if (fn === 'LoopOn') { if (!inp) return false; }
+  else if (/^Set(Text|Image|Color|ImageVisibleOn|ImageVisibleOff)$/.test(fn)) {
+    const name = q.get('SelectedName');
+    if (!inp || !name) return false;
+    if (fn === 'SetText') inp.text = { ...inp.text, [name]: q.get('Value') ?? '' };
+  }
+  else if (fn === 'TitleBeginAnimation') { if (!inp || !q.get('Value')) return false; }
   else if (fn === 'PreviewInput') { if (!inp) return false; s.preview = inp.number; }
   else if (fn === 'Cut' || fn === 'Fade') [s.active, s.preview] = [s.preview, s.active];
   else if (fn === 'ReplayMarkInOutLive') s.events++;

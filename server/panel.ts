@@ -1,10 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { ActionInput, ActionName, ActionResult } from '../shared/actions';
+import type { ActionInput, ActionName, ActionResult, GfxRequest } from '../shared/actions';
 import type { DebugEntry, DebugInfo, DebugKind } from '../shared/debug';
 import type { ControllingItem, PanelState, ScheduleState, Score, SimState, Tick, VideoState } from '../shared/state';
 import type { Config, VmixCall } from './config';
 import { PanelError } from './errors';
+import { Graphics } from './graphics';
 import { emptyLog, type MatchLog, Monitor, type MonitorContext } from './monitor';
 import { ReplayBook, type ReplayBookData, type Scene } from './replays';
 import { type VmixClient, VmixError, type VmixInput, type VmixState } from './vmix';
@@ -22,6 +23,8 @@ interface Persisted {
   day?: string;
   book?: ReplayBookData;
   periodManual?: number | null;
+  gameConfig?: string; // the TCunihockey game config as it was imported
+  periodScores?: { home: number; away: number }[];
   schedule?: ScheduleStore;
   ticks?: Record<string, boolean>;
   log?: MatchLog;
@@ -75,6 +78,10 @@ export class Panel {
   private vm: VmixState | null = null; // null while vMix is unreachable
   private readonly book: ReplayBook; // the scenes and which vMix event tab holds them
   private periodManual: number | null = null; // period chosen by the operator; null = follow the scoreboard
+  private readonly gfx: Graphics | null; // on-screen graphics from the game config
+  private gameConfig = ''; // as imported, to load it again after a restart
+  private periodScores: { home: number; away: number }[] = []; // running score at the end of each period
+  private lastScorePeriod: number | null = null;
   private breakPeriod: number | null = null; // period the break clip shows; null = the current one
   // Replay playback in progress. id null = a whole tab. minUntil: it cannot be over before that; offSince: since
   // when the replay has not been on program.
@@ -115,7 +122,12 @@ export class Panel {
     const sameDay = saved.day === today();
     const { replay } = cfg;
     this.book = new ReplayBook((params) => vmix.call(params), replay.periods.map((p) => p.tab), replay.highlightTab, replay.seconds, sameDay ? saved.book : undefined);
-    this.periodManual = sameDay ? saved.periodManual ?? null : null; // like the book, only valid for the day it was set
+    this.periodManual = sameDay ? saved.periodManual ?? null : null;
+    this.gfx = cfg.graphics ? new Graphics(cfg.graphics, (params) => vmix.call(params), (input) => this.ref(input)) : null;
+    if (saved.gameConfig && this.gfx) {
+      try { this.gfx.load(saved.gameConfig); this.gameConfig = saved.gameConfig; } catch { /* an unreadable old config is simply not loaded */ }
+    }
+    if (sameDay) this.periodScores = saved.periodScores ?? []; // like the book, only valid for the day it was set
     const s = sameDay ? saved.schedule : undefined;
     this.schedule = s?.anchors && cfg.schedules.some((x) => x.id === s.id) ? s : { id: cfg.schedules[0].id, anchors: {}, rounds: {} };
     if (sameDay) this.ticks = saved.ticks ?? {};
@@ -240,6 +252,9 @@ export class Panel {
       this.monitor.update(this.vm, this.monitorContext(now));
       this.runDueSteps(now);
       this.directSound(now);
+      this.trackPeriods();
+      if (this.gfx && this.cfg.graphics) this.gfx.sync(this.vm.inputs.find((i) => i.number === this.vm?.overlays[this.cfg.graphics?.overlay ?? 0])?.title);
+      this.gfx?.tick(now);
     }
     if (this.notice && now > this.notice.until) this.notice = null;
     if (this.monitor.dirty || now - this.lastSaved > 20_000) this.persist();
@@ -314,6 +329,38 @@ export class Panel {
     return { home: f(sb.home), away: f(sb.away), period: period && sb.periodFormat.replace('{}', period), clock, teams: names.every(Boolean) ? names.join(' – ') : '' };
   }
 
+  private scoreText(): { home: string; away: string } | null {
+    const s = this.score();
+    return s && (s.home || s.away) ? { home: s.home, away: s.away } : null;
+  }
+
+  private scoreNumbers(): { home: number; away: number } | null {
+    const s = this.score();
+    return s && /^\d+$/.test(s.home) && /^\d+$/.test(s.away) ? { home: Number(s.home), away: Number(s.away) } : null;
+  }
+
+  /** Remembers the score whenever the scoreboard moves on to the next period, for the period results under a result. */
+  private trackPeriods(): void {
+    const period = this.scoreboardPeriod();
+    const score = this.scoreNumbers();
+    if (period === null || !score) return;
+    if (this.lastScorePeriod !== null && period > this.lastScorePeriod) {
+      for (let p = this.lastScorePeriod; p < period; p++) this.periodScores[p] = score;
+      this.persist();
+    }
+    if (period === 0 && this.lastScorePeriod !== 0) this.periodScores = []; // a new game has started on the scoreboard
+    this.lastScorePeriod = period;
+  }
+
+  /** "(1:0, 2:1)": goals per finished period, plus the running one. */
+  private periodResults(): string {
+    const score = this.scoreNumbers();
+    if (!score) return '';
+    const ends = [...this.periodScores.filter(Boolean), score];
+    const parts = ends.map((e, i) => `${e.home - (ends[i - 1]?.home ?? 0)}:${e.away - (ends[i - 1]?.away ?? 0)}`);
+    return `(${parts.join(', ')})`;
+  }
+
   /** Period shown on the scoreboard as an index into the configured periods; anything that is not 1, 2, 3 ... counts as the last (overtime). */
   private scoreboardPeriod(): number | null {
     const sb = this.cfg.scoreboard;
@@ -384,9 +431,14 @@ export class Panel {
     need(cfg.audio?.breakVideo, 'Pausenvideo');
     cfg.sponsor?.inputs.forEach((i) => need(i, 'Sponsor'));
     cfg.logos.forEach((l) => need(l.input, l.name));
+    Object.values(cfg.graphics?.titles ?? {}).forEach((t) => need(t, 'Einblender'));
     [...cfg.replay.highlightClip.intro, ...cfg.replay.highlightClip.outro].forEach((i) => need(i, 'Highlight-Clip'));
     need(cfg.replay.highlightMusic, 'Highlight-Musik');
+    const needGame = (calls: VmixCall[], what: string) => {
+      if (this.gfx && !this.gfx.loaded && calls.some((c) => 'gfx' in c && c.gfx !== 'hide')) w.push(`${what}: Spiel-Konfiguration fehlt (im Tab Einblender laden)`);
+    };
     for (const s of cfg.schedules) {
+      for (const step of s.steps) if (step.action) needGame(step.action.calls, step.label);
       if (s.start) needCalls(s.start.calls, s.start.label);
       if (s.end) needCalls(s.end.calls, s.end.label);
       for (const step of s.steps) if (step.action) needCalls(step.action.calls, step.label);
@@ -544,6 +596,7 @@ export class Panel {
         ? { sources, preset: sources.every((s) => s.on) ? 'game' : sources.every((s) => !s.on) ? 'pause' : null }
         : null,
       music: this.musicState(),
+      gfx: this.gfx ? this.gfx.view(this.scoreText(), this.periodResults()) : null,
       breakSound: cfg.audio?.music && cfg.audio.breakVideo ? { music: this.breakMusic } : null,
       sponsor: cfg.sponsor?.inputs.length
         ? { enabled: this.sponsor.enabled, nextAt: this.sponsor.nextAt, activeUntil: this.sponsor.activeUntil, intervalSec: cfg.sponsor.intervalSec, durationSec: cfg.sponsor.durationSec }
@@ -599,7 +652,7 @@ export class Panel {
   }
 
   private persist(): void {
-    const data: Persisted = { day: today(), book: this.book.toJSON(), periodManual: this.periodManual, schedule: this.schedule, ticks: this.ticks, log: this.monitor.log, recordGame: this.recordGame, breakMusic: this.breakMusic };
+    const data: Persisted = { day: today(), book: this.book.toJSON(), periodManual: this.periodManual, gameConfig: this.gameConfig, periodScores: this.periodScores, schedule: this.schedule, ticks: this.ticks, log: this.monitor.log, recordGame: this.recordGame, breakMusic: this.breakMusic };
     this.monitor.dirty = false;
     this.lastSaved = Date.now();
     fs.mkdirSync(path.dirname(this.dataFile), { recursive: true });
@@ -649,6 +702,7 @@ export class Panel {
   }
 
   private async step(c: Exclude<VmixCall, { wait: number } | { clip: string }>): Promise<void> {
+    if ('gfx' in c) { await this.showGraphic(c.gfx); return; }
     if (!('panel' in c)) { await this.vmix.call(c.Input !== undefined ? { ...c, Input: this.ref(c.Input) } : c); return; }
     if (c.panel === 'playHighlights') await this.playReel(this.cfg.replay.highlightTab, this.cfg.replay.highlightMusic || undefined);
     else if (c.panel === 'audioGame' || c.panel === 'audioPause') await this.setAudio(c.panel === 'audioGame');
@@ -658,6 +712,13 @@ export class Panel {
     else if (c.panel === 'logosOn' || c.panel === 'logosOff') await this.setLogos(c.panel === 'logosOn');
     else if (c.panel === 'startAll') await this.setOutputs(true);
     else if (c.panel === 'stopAll') await this.setOutputs(false);
+  }
+
+  private async showGraphic(req: GfxRequest | 'hide'): Promise<void> {
+    if (!this.gfx) throw new PanelError('In config.json sind keine Einblender (graphics) hinterlegt');
+    if (req === 'hide') { await this.gfx.hide(); return; }
+    const s = this.scoreText();
+    await this.gfx.show(req, s ? `${s.home}:${s.away}` : '', this.periodResults());
   }
 
   /** Stream, replay recording and (if wanted) the local recording together. Stopping always stops a running recording. */
@@ -1200,6 +1261,20 @@ export class Panel {
       else this.sim = null;
     },
 
+    'gfx/import': async ({ text }) => {
+      if (!this.gfx) throw new PanelError('In config.json sind keine Einblender (graphics) hinterlegt');
+      this.gfx.load(text);
+      this.gameConfig = text;
+      this.persist();
+    },
+
+    'gfx/show': async (req) => {
+      await this.showGraphic(req);
+    },
+
+    'gfx/next': async () => { await this.gfx?.next(); },
+    'gfx/hide': async () => { await this.showGraphic('hide'); },
+
     tick: async ({ id, done }) => {
       this.ticks[id] = done;
       this.persist();
@@ -1211,6 +1286,7 @@ export class Panel {
       this.ticks = {};
       this.monitor.log = emptyLog();
       this.book.reset();
+      this.periodScores = [];
       this.periodManual = null;
       this.breakPeriod = null;
       this.schedule = { id: this.cfg.schedules[0].id, anchors: { [this.cfg.schedules[0].id]: this.kickoff() }, rounds: {} };

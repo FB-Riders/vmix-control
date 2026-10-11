@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
+import { gfxRequest } from '../shared/actions';
 
 const vmixCall = z.union([
   z.object({ wait: z.number().positive() }),
@@ -9,6 +10,8 @@ const vmixCall = z.union([
   z.object({ clip: z.string(), wait: z.boolean().default(true), seconds: z.number().positive().optional() }),
   // Things the panel does itself rather than a single vMix function.
   z.object({ panel: z.enum(['audioGame', 'audioPause', 'playHighlights', 'highlightClip', 'periodClip', 'breakSound', 'overlaysOff', 'overlaysOn', 'waitPlayback', 'startAll', 'stopAll', 'logosOn', 'logosOff']) }),
+  // An on-screen graphic filled from the game config (as on the Einblender screen), or "hide" to take it off again.
+  z.object({ gfx: z.union([z.literal('hide'), gfxRequest]) }),
   z.object({
     Function: z.string(),
     Input: z.union([z.string(), z.number()]).optional(),
@@ -93,6 +96,41 @@ const configSchema = z.object({
     durationSec: z.number().positive(),
   }).optional(),
   logos: z.array(z.object({ name: z.string(), input: z.string(), overlay: z.number().int().min(1).max(8) })).default([]),
+  // On-screen graphics from the game config, shown through the league's vMix titles.
+  graphics: z.object({
+    overlay: z.number().int().min(1).max(8).default(2),
+    logoPath: z.string().default(''), // folder with <TeamShort>.png on the vMix computer; empty = leave the logos alone
+    logoExt: z.string().default('.png'),
+    titles: z.object({
+      board: z.string(), leagueInfo: z.string(), teamInfo: z.string(), playerEvent: z.string(), playerName: z.string(),
+      lineupHome: z.string(), lineupAway: z.string(), startingSix: z.string(),
+    }),
+    opener: z.object({ top: z.string(), main: z.string(), bottom: z.string() }).default({ top: '{date}', main: '{time}', bottom: '{location}' }),
+    penalties: z.array(z.string()).default(["2'", "2'+2'", "5'", "10'"]),
+    shortcuts: z.array(z.string()).default([]),
+    // Graphics that go off by themselves, kind -> seconds on screen. All others stay until they are taken off.
+    autoHideSec: z.record(z.string(), z.number().positive()).default({ goal: 8, penalty: 8, name: 8, bestPlayer: 8 }),
+    labels: z.object({
+      ownGoal: z.string().default('Eigentor'),
+      startingSix: z.string().default('Starting 6'),
+      bestPlayer: z.string().default('Best Player'),
+      timeout: z.string().default('Time Out'),
+      coach: z.string().default('Coach'),
+      commentator: z.string().default('Kommentar'),
+      referee: z.string().default('Schiedsrichter'),
+      lineup: z.string().default('Aufstellung'),
+      lines: z.array(z.string()).default(['Linie 1', 'Linie 2', 'Linie 3', 'Linie 4']),
+      goalies: z.string().default('Goalies'),
+      result: z.object({
+        first: z.string().default('Resultat 1. Drittel'),
+        second: z.string().default('Resultat 2. Drittel'),
+        third: z.string().default('Resultat 3. Drittel'),
+        end: z.string().default('Schlussresultat'),
+        overtime: z.string().default('Schlussresultat (n.V.)'),
+        penalties: z.string().default('Schlussresultat (n.P.)'),
+      }).prefault({}),
+    }).prefault({}),
+  }).optional(),
   preGame: z.object({
     streamLeadMinutes: z.number().positive().default(30),
     onStreamStart: z.array(vmixCall).default([]), // run by STREAM STARTEN before the stream goes out

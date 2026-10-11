@@ -189,7 +189,7 @@ export class ReplayBook {
   async playTab(tab: number, channel: string): Promise<boolean> {
     if (!this.count(tab)) return false;
     await this.show(tab);
-    await this.call({ Function: 'ReplayPlayAllEventsToOutput', Channel: channel });
+    await this.call({ Function: 'ReplayPlayAllEventsToOutput', Channel: channel || undefined });
     return true;
   }
 }

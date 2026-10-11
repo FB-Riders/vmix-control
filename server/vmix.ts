@@ -80,7 +80,8 @@ export class VmixClient {
   private async get(params?: VmixParams): Promise<string> {
     const qs = params
       ? '?' + Object.entries(params)
-          .filter(([, v]) => v !== undefined && v !== '')
+          // An empty Value is meant: it clears a title's text field.
+          .filter(([k, v]) => v !== undefined && (v !== '' || k === 'Value'))
           .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join('&')
       : '';
     const res = await fetch(this.baseUrl + qs, { signal: AbortSignal.timeout(2000) });

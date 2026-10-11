@@ -229,7 +229,7 @@
         {
           "at": "-07:00",
           "label": "Aufstellungen Gast, Heim",
-          "sub": "Kamera M mit Hallenton, Aufstellungen auf Overlay 2",
+          "sub": "Kamera M mit Hallenton, Aufstellungen aus der Spiel-Konfiguration",
           "action": {
             "label": "AUFSTELLUNGEN",
             "auto": true,
@@ -242,27 +242,31 @@
                 "panel": "audioGame"
               },
               {
-                "Function": "OverlayInput2In",
-                "Input": "LUPL-SU_team_lineup_away.gtzip"
+                "gfx": {
+                  "kind": "lineup",
+                  "team": "away"
+                }
               },
               {
                 "wait": 40000
               },
               {
-                "Function": "OverlayInput2Out"
+                "gfx": "hide"
               },
               {
                 "wait": 3000
               },
               {
-                "Function": "OverlayInput2In",
-                "Input": "LUPL-SU_team_lineup_home.gtzip"
+                "gfx": {
+                  "kind": "lineup",
+                  "team": "home"
+                }
               },
               {
                 "wait": 40000
               },
               {
-                "Function": "OverlayInput2Out"
+                "gfx": "hide"
               }
             ]
           },
@@ -406,6 +410,40 @@
       ]
     }
   ],
+  "graphics": {
+    "overlay": 2,
+    "logoPath": "",
+    "titles": {
+      "board": "LUPL-SU_board.gtzip",
+      "leagueInfo": "LUPL-SU_league_info.gtzip",
+      "teamInfo": "LUPL-SU_team_info.gtzip",
+      "playerEvent": "LUPL-SU_team_player_event.gtzip",
+      "playerName": "LUPL-SU_team_player_name.gtzip",
+      "lineupHome": "LUPL-SU_team_lineup_home.gtzip",
+      "lineupAway": "LUPL-SU_team_lineup_away.gtzip",
+      "startingSix": "LUPL-SU_team_startingsix.gtzip"
+    },
+    "opener": {
+      "top": "{date}",
+      "main": "{time}",
+      "bottom": "{location}"
+    },
+    "penalties": [
+      "2'",
+      "2'+2'",
+      "5'",
+      "10'"
+    ],
+    "shortcuts": [
+      "Entschuldigen Sie die technische Störung!\nWir arbeiten mit Hochdruck an der Lösung!"
+    ],
+    "autoHideSec": {
+      "goal": 8,
+      "penalty": 8,
+      "name": 8,
+      "bestPlayer": 8
+    }
+  },
   "preGame": {
     "streamLeadMinutes": 30,
     "onStreamStart": [

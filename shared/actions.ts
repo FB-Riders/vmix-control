@@ -2,6 +2,17 @@ import { z } from 'zod';
 
 // Every action the panel can trigger: POST /api/<name> with this JSON body.
 // The server validates with these schemas; the client only imports the inferred types.
+/** One on-screen graphic to show. Which fields are needed depends on the kind. */
+export const gfxRequest = z.object({
+  kind: z.enum(['opener', 'result', 'commentators', 'referees', 'text', 'coach', 'timeout', 'lineup', 'startingSix', 'goal', 'penalty', 'name', 'bestPlayer']),
+  team: z.enum(['home', 'away']).optional(),
+  player: z.string().optional(), // shirt number, or "own" for an own goal
+  value: z.string().optional(), // result label id, penalty length, or "1" / "2" for a single commentator or referee
+  text: z.string().max(300).optional(), // free text, or the period results under a result
+});
+export type GfxRequest = z.infer<typeof gfxRequest>;
+export type GfxSide = NonNullable<GfxRequest['team']>;
+
 export const actionSchemas = {
   program: z.object({ cam: z.string() }),
   preview: z.object({ cam: z.string() }),
@@ -37,6 +48,10 @@ export const actionSchemas = {
   'post/finish': z.object({}),
   'video/speed': z.object({ speed: z.number().min(10).max(100) }),
   'video/export': z.object({}),
+  'gfx/import': z.object({ text: z.string().min(10).max(200_000) }), // a TCunihockey game config
+  'gfx/show': gfxRequest,
+  'gfx/next': z.object({}), // starting six: next player
+  'gfx/hide': z.object({}),
   tick: z.object({ id: z.string(), done: z.boolean() }),
   'match/reset': z.object({}),
   'sim/start': z.object({ schedule: z.string().optional() }),

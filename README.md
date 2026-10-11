@@ -43,6 +43,31 @@ The **controlling list** is filled from what actually went out: when the stream 
 program (and in which break), share of stream time with logos, drop-outs, stalls. vMix does not report bitrate,
 dropped frames or the Hub's status, so those are not shown.
 
+## On-screen graphics (Einblender)
+
+The EINBLENDER screen replaces TCunihockey for everything except the match clock, which comes from the scoreboard.
+Load the game's `game-config.txt` there (the TCunihockey format written by <https://www.unihockey.live/generator>;
+UTF-8, UTF-16 and ANSI files are read). The panel then fills the league's vMix titles and fades them in on one
+overlay channel, one at a time:
+
+| Graphic | vMix title (`graphics.titles`) | Filled with |
+| --- | --- | --- |
+| Opener, result | `board` | team names; date, time and location (`graphics.opener`), or the score read from the scoreboard with the period results the panel has tracked |
+| Commentators, referees, free text | `leagueInfo` | label and names from `[Game]` |
+| Coach, time-out | `teamInfo` | `Coach` / `Headcoach` of the team |
+| Goal, penalty | `playerEvent` | current score or penalty length, number, name |
+| Name, best player | `playerName` | number, name |
+| Line-up | `lineupHome` / `lineupAway` | `Line1`–`Line4`, `Goal`, coach |
+| Starting six | `startingSix` | first goalie and first line; fades in with the team logo, then the stepper brings on one player at a time (the title's animation pages `Page1`–`Page6`) |
+
+Goal, penalty, name and best player graphics go off by themselves after 8 s (`graphics.autoHideSec`, kind → seconds;
+add e.g. `"timeout": 8`, or remove an entry to keep that graphic on). All others stay until AUSBLENDEN.
+
+Names are written in capitals; a player whose name is filed under `00` gets the top scorer icon. Team logos are
+only set if `graphics.logoPath` names the folder with `<TeamShort>.png` on the vMix computer. Labels
+(`graphics.labels`), penalty lengths and shortcut texts are in `config.json`. `dev/examples/` holds the league's
+example game config.
+
 ## Debug bar
 
 "Debug" at the right end of the desktop footer (or `?debug` in the address, also on a phone) opens a bar at the
@@ -117,6 +142,10 @@ Calls in `action.calls`, `start.calls`, `end.calls` and `finish.calls` are vMix 
 taken to program from the start; the sequence goes on when the clip has finished, or at once with `"wait": false`
 for a looping clip), pauses `{ "wait": 500 }`, or panel steps `{ "panel": "…" }`:
 `audioPause`, `audioGame`, `logosOn`, `logosOff`, `overlaysOff` (all overlay channels off and kept off) / `overlaysOn` (put the same ones back), `highlightClip` (intro clips, highlight reel, outro clips from `replay.highlightClip`; without highlights only the intro clips run), `playHighlights`, `waitPlayback` (until the replay is over), `startAll`, `stopAll`
+
+A step can also show an on-screen graphic filled from the loaded game config, exactly as the Einblender screen does:
+`{ "gfx": { "kind": "lineup", "team": "away" } }`, and `{ "gfx": "hide" }` to take it off again. The pre-game
+"Aufstellungen" step uses this for both line-ups. Without a loaded game config the panel warns and the step shows nothing.
 (stream, recording and replay recording). If one call fails the rest still runs and the failure shows as an alert.
 
 Restart `start.bat` after changing `config.json`. "Neues Spiel" on the pre-game screen clears checklist, controlling

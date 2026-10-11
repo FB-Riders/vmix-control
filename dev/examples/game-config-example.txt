@@ -1,0 +1,81 @@
+[Game]
+GameNr=897281
+LeagueId=luplw
+Title=NLB
+Date=23.06.2023
+Time=20:00
+Location=Buchholz, Uster
+Referee1=Josef Fässler
+Referee2=Benjamin Schläpfer
+Commentator1=Tom Surbeck
+Commentator2=Raphi Berweger
+
+[Home]
+6=Florian Nideröst
+9=Mikulas Komarek
+10=Oskar Henriksson
+12=Sandro Kellermüller
+14=Thomas Aellig
+17=Romano Schubiger
+19=Fabian Steiger
+20=Raphael Berweger
+21=Florian Bolliger
+22=Nicola Heierli
+37=Nicola Brütsch
+46=David Holenstein
+53=Jean-Luc Klöti
+55=Timon Stäubli
+58=Marco Hurni
+59=Andrea Vitali
+70=Simon Suter
+74=Nino Scherrer
+77=Niko Juhola
+87=Manuel Hummer
+95=Tobias Ledergerber
+96=Marco Klauenbösch
+00=Simon Suter
+TeamLong=UHC Uster
+TeamShort=UST
+Coach=Simon Meier
+Starting6=46,6,00,10,12,14
+Line1=77,53,21,20,19
+Line2=17,-,00,9,22
+Line3=70,87,,96,55
+Line4=58,59,70,77,14
+Goal=46,-
+
+[Away]
+1=Janik Feiner
+4=Mario Jung
+11=Remo Blumenthal
+12=Andri Bischofberger
+14=Andrin Zellweger
+17=Jan Binggeli
+18=Luzian Weber
+20=Martin Tokos
+21=Paolo Riedi
+23=Renzo Riet Mayer
+27=Kalle Keskitalo
+39=Ivano Torri
+61=Joel Hirschi
+65=Daniel Gerber
+66=Marcel Stucki
+71=Fabian Beeler
+74=Curdin Furrer
+81=Manuel Rieder
+89=Luzi Weber
+90=Sandro Cavelti
+91=Sandro Aeschbacher
+00=Joel Hirschi
+TeamLong=Chur Unihockey
+TeamShort=CHUR
+Coach=Daniel Hahne
+Starting6=1,4,11,12,14,17
+Line1=11,12,14,17,18
+Line2=20,21,23,27,39
+Line3=61,65,66,71,74
+Line4=81,89,90,91,39
+Goal=1,4
+
+[Game-Config]
+[LastLineInConfig]

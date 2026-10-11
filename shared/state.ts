@@ -148,6 +148,30 @@ export interface PostGameState {
   video: VideoState | null;
 }
 
+export interface GfxPlayer { nr: string; name: string; top: boolean } // top = top scorer
+
+export interface GfxTeam {
+  long: string;
+  short: string;
+  coach: string;
+  players: GfxPlayer[];
+  startingSix: GfxPlayer[]; // first goalie and first line
+}
+
+/** On-screen graphics filled from the game config (what TCunihockey used to do). */
+export interface GfxState {
+  game: { title: string; date: string; time: string; location: string; referees: string[]; commentators: string[] } | null;
+  home: GfxTeam | null;
+  away: GfxTeam | null;
+  live: { kind: string; team?: 'home' | 'away'; summary: string; until: number | null; six: { shown: number; total: number } | null } | null;
+  score: { home: string; away: string } | null; // as read from the scoreboard
+  periods: string; // period results so far, e.g. "(1:0, 2:1)"
+  penalties: string[];
+  shortcuts: string[];
+  results: { id: string; label: string }[];
+  overlay: number;
+}
+
 export interface PanelState {
   now: number; // server clock, epoch ms
   connected: boolean; // server reaches vMix
@@ -160,6 +184,7 @@ export interface PanelState {
   replay: ReplayState;
   audio: AudioState | null;
   music: { name: string; track: string; playing: boolean } | null; // background music input
+  gfx: GfxState | null; // null if no graphics are configured
   breakSound: { music: boolean } | null; // break video: its own sound, or muted with the background music over it
   sponsor: SponsorState | null;
   logos: { visible: boolean } | null; // all league logos are on
