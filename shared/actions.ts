@@ -54,6 +54,11 @@ export const actionSchemas = {
   'gfx/show': gfxRequest,
   'gfx/next': z.object({}), // starting six: next player
   'gfx/hide': z.object({}),
+  // Penalty shoot-out display in place of the match clock.
+  'shootout/show': z.object({ on: z.boolean() }),
+  'shootout/shot': z.object({ team: z.enum(['home', 'away']), result: z.enum(['goal', 'miss']) }),
+  'shootout/undo': z.object({ team: z.enum(['home', 'away']) }),
+  'shootout/reset': z.object({ all: z.boolean() }), // circles only, or the whole shoot-out
   tick: z.object({ id: z.string(), done: z.boolean() }),
   'match/reset': z.object({}),
   'sim/start': z.object({ schedule: z.string().optional() }),

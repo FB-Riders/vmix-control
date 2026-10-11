@@ -162,6 +162,17 @@ export interface GfxTeam {
   startingSix: GfxPlayer[]; // first goalie and first line
 }
 
+export type Shot = 'goal' | 'miss';
+
+/** Penalty shoot-out display. `row` = the circles of the current round, `goals` / `attempts` = the whole shoot-out. */
+export interface ShootoutState {
+  live: boolean;
+  home: { row: Shot[]; goals: number; attempts: number };
+  away: { row: Shot[]; goals: number; attempts: number };
+  slots: number;
+  overlay: number;
+}
+
 /** On-screen graphics filled from the game config (what TCunihockey used to do). */
 export interface GfxState {
   game: { title: string; date: string; time: string; location: string; referees: string[]; commentators: string[] } | null;
@@ -189,6 +200,7 @@ export interface PanelState {
   audio: AudioState | null;
   music: { name: string; track: string; playing: boolean } | null; // background music input
   gfx: GfxState | null; // null if no graphics are configured
+  shootout: ShootoutState | null; // null if no shoot-out title is configured
   breakSound: { music: boolean } | null; // break video: its own sound, or muted with the background music over it
   sponsor: SponsorState | null;
   logos: { visible: boolean } | null; // all league logos are on

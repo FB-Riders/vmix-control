@@ -439,6 +439,14 @@
     "shortcuts": [
       "Entschuldigen Sie die technische Störung!\nWir arbeiten mit Hochdruck an der Lösung!"
     ],
+    "shootout": {
+      "input": "LUPL-SU_scoreboard_penaltyshooting.gtzip",
+      "colors": {
+        "open": "#FFFFFF",
+        "goal": "#2EA043",
+        "miss": "#CD1619"
+      }
+    },
     "autoHideSec": {
       "goal": 8,
       "penalty": 8,

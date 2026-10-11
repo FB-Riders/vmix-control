@@ -114,6 +114,11 @@ const configSchema = z.object({
     shortcuts: z.array(z.string()).default([]),
     // Graphics that go off by themselves, kind -> seconds on screen. All others stay until they are taken off.
     autoHideSec: z.record(z.string(), z.number().positive()).default({ goal: 8, penalty: 8, name: 8, bestPlayer: 8 }),
+    // Penalty shoot-out display: takes the match clock's place on its overlay channel. Colours of the five circles per team.
+    shootout: z.object({
+      input: z.string(),
+      colors: z.object({ open: z.string().default('#FFFFFF'), goal: z.string().default('#2EA043'), miss: z.string().default('#CD1619') }).prefault({}),
+    }).optional(),
     labels: z.object({
       ownGoal: z.string().default('Eigentor'),
       startingSix: z.string().default('Starting 6'),

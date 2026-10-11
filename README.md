@@ -58,6 +58,7 @@ overlay channel, one at a time:
 | Goal, penalty | `playerEvent` | current score or penalty length, number, name |
 | Name, best player | `playerName` | number, name |
 | Line-up | `lineupHome` / `lineupAway` | `Line1`–`Line4`, `Goal`, coach |
+| Penalty shoot-out | `graphics.shootout.input` | not from the game config: five circles per team, coloured per attempt (`colors.goal` / `miss` / `open`); goes on the match clock's overlay channel in its place, names and score copied from the clock title |
 | Starting six | `startingSix` | first goalie and first line; fades in with the team logo, then the stepper brings on one player at a time (the title's animation pages `Page1`–`Page6`) |
 
 Goal, penalty, name and best player graphics go off by themselves after 8 s (`graphics.autoHideSec`, kind → seconds;

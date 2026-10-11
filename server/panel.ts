@@ -8,6 +8,7 @@ import { PanelError } from './errors';
 import { Graphics, parseIni } from './graphics';
 import { emptyLog, type MatchLog, Monitor, type MonitorContext } from './monitor';
 import { ReplayBook, type ReplayBookData, type Scene } from './replays';
+import { Shootout, type ShootoutFacts } from './shootout';
 import { parseSponsors, type SponsorSet, Sponsors } from './sponsors';
 import { type VmixClient, VmixError, type VmixInput, type VmixState } from './vmix';
 
@@ -88,7 +89,7 @@ export class Panel {
   // Replay playback in progress. id null = a whole tab. minUntil: it cannot be over before that; offSince: since
   // when the replay has not been on program.
   private playing: { id: number | null; since: number; seen: boolean; minUntil: number; offSince: number } | null = null;
-  private clockHidden = false; // scoreboard overlay taken off for a replay, to be restored
+  private clockHidden: string | null = null; // scoreboard overlay taken off for a replay, to be restored
   private hiddenOverlays: { channel: number; input: string }[] = []; // taken off for the highlights, to be restored
   // Sound direction: while a clip sequence or a break runs, the music follows what is on program (see directSound).
   private sequences = 0; // clip sequences in progress (break clip, end clip, highlight video)
@@ -100,6 +101,7 @@ export class Panel {
   private pollMs = 0; // how long the last state request to vMix took
   private holdOverlays = false; // overlays stay off beyond the highlight scenes: whole highlight video, whole break
   private readonly sponsors: Sponsors | null;
+  private readonly shootout: Shootout | null; // penalty shoot-out display in place of the match clock
   private sponsorSet: SponsorSet | null = null; // as imported, to have it again after a restart
   private schedule: ScheduleStore;
   private autoRun = true;
@@ -127,6 +129,8 @@ export class Panel {
     this.book = new ReplayBook((params) => vmix.call(params), replay.periods.map((p) => p.tab), replay.highlightTab, replay.seconds, sameDay ? saved.book : undefined);
     this.periodManual = sameDay ? saved.periodManual ?? null : null;
     this.gfx = cfg.graphics ? new Graphics(cfg.graphics, (params) => vmix.call(params), (input) => this.ref(input)) : null;
+    const so = cfg.graphics?.shootout;
+    this.shootout = so ? new Shootout({ ...so, overlay: cfg.scoreboard?.overlay ?? 1 }, (params) => vmix.call(params), (input) => this.ref(input)) : null;
     this.sponsorSet = saved.sponsors ?? null;
     this.sponsors = cfg.sponsor ? new Sponsors(cfg.sponsor, (params) => vmix.call(params), (input) => this.ref(input), this.sponsorSet) : null;
     if (saved.gameConfig && this.gfx) {
@@ -258,6 +262,10 @@ export class Panel {
         // No sponsor over a replay, the highlights or the break.
         this.sponsors.tick(now, !!this.playing || this.holdOverlays, sp.inputs.some((i) => this.findInput(i)?.number === onChannel));
       }
+      if (this.shootout) {
+        this.shootout.sync(now, this.findInput(this.shootout.input)?.number === this.vm.overlays[this.cfg.scoreboard?.overlay ?? 1]);
+        if (this.shootout.live) this.shootout.facts(this.shootoutFacts()).catch(() => {}); // the score follows the scoreboard
+      }
       this.monitor.update(this.vm, this.monitorContext(now));
       this.runDueSteps(now);
       this.directSound(now);
@@ -336,6 +344,24 @@ export class Panel {
     const period = f(sb.period);
     const clock = [sb.clock].flat().map(f).join('');
     return { home: f(sb.home), away: f(sb.away), period: period && sb.periodFormat.replace('{}', period), clock, teams: names.every(Boolean) ? names.join(' – ') : '' };
+  }
+
+  /** Names and score for the shoot-out display: as on the match clock, else from the game config. */
+  private shootoutFacts(): ShootoutFacts {
+    const sb = this.cfg.scoreboard;
+    const fields = (sb && this.findInput(sb.input)?.fields) || {};
+    const f = (name: string | undefined) => (name ? fields[name]?.trim() ?? '' : '');
+    const teams = this.gfx?.teams();
+    return {
+      homeName: f(sb?.homeName) || teams?.home.short || '', awayName: f(sb?.awayName) || teams?.away.short || '',
+      homeScore: f(sb?.home), awayScore: f(sb?.away),
+      homeLogo: teams?.home.logo ?? '', awayLogo: teams?.away.logo ?? '',
+    };
+  }
+
+  private needShootout(): Shootout {
+    if (!this.shootout) throw new PanelError('In config.json ist kein Titel für das Penalty-Schiessen hinterlegt (graphics.shootout)');
+    return this.shootout;
   }
 
   private scoreText(): { home: string; away: string } | null {
@@ -441,6 +467,7 @@ export class Panel {
     cfg.sponsor?.inputs.forEach((i) => need(i, 'Sponsor'));
     cfg.logos.forEach((l) => need(l.input, l.name));
     Object.values(cfg.graphics?.titles ?? {}).forEach((t) => need(t, 'Einblender'));
+    need(cfg.graphics?.shootout?.input, 'Penalty-Schiessen');
     [...cfg.replay.highlightClip.intro, ...cfg.replay.highlightClip.outro].forEach((i) => need(i, 'Highlight-Clip'));
     need(cfg.replay.highlightMusic, 'Highlight-Musik');
     const needGame = (calls: VmixCall[], what: string) => {
@@ -606,6 +633,7 @@ export class Panel {
         : null,
       music: this.musicState(),
       gfx: this.gfx ? this.gfx.view(this.scoreText(), this.periodResults()) : null,
+      shootout: this.shootout?.view() ?? null,
       breakSound: cfg.audio?.music && cfg.audio.breakVideo ? { music: this.breakMusic } : null,
       sponsor: this.sponsors && cfg.sponsor?.inputs.length ? this.sponsors.view() : null,
       logos: logos.length ? { visible: logos.every((l) => l.visible) } : null,
@@ -820,10 +848,12 @@ export class Panel {
 
   private async hideClock(): Promise<void> {
     const sb = this.cfg.scoreboard;
-    const inp = this.findInput(sb?.input);
-    if (!this.cfg.replay.hideScoreboard || !sb?.overlay || !inp || this.vm?.overlays[sb.overlay] !== inp.number) return;
+    if (!this.cfg.replay.hideScoreboard || !sb?.overlay) return;
+    // The clock, or the shoot-out display that has taken its place.
+    const inp = [sb.input, this.shootout?.input].map((i) => this.findInput(i)).find((i) => i && this.vm?.overlays[sb.overlay as number] === i.number);
+    if (!inp) return;
     await this.vmix.call({ Function: `OverlayInput${sb.overlay}Out` });
-    this.clockHidden = true;
+    this.clockHidden = inp.key;
   }
 
   /** Highlights run clean: every overlay channel, league logos included, goes off and comes back afterwards. */
@@ -845,8 +875,9 @@ export class Panel {
   private async afterPlayback(): Promise<void> {
     const sb = this.cfg.scoreboard;
     if (this.clockHidden && sb?.overlay) {
-      this.clockHidden = false;
-      await this.vmix.call({ Function: `OverlayInput${sb.overlay}In`, Input: this.ref(sb.input) });
+      const input = this.clockHidden;
+      this.clockHidden = null;
+      await this.vmix.call({ Function: `OverlayInput${sb.overlay}In`, Input: input });
     }
     if (!this.holdOverlays) await this.restoreOverlays();
   }
@@ -1281,6 +1312,16 @@ export class Panel {
     'gfx/next': async () => { await this.gfx?.next(); },
     'gfx/hide': async () => { await this.showGraphic('hide'); },
 
+    'shootout/show': async ({ on }) => {
+      const so = this.needShootout();
+      if (on) { await so.show(this.shootoutFacts()); return; }
+      const clock = this.findInput(this.cfg.scoreboard?.input);
+      await so.hide(clock?.key); // the match clock comes back in its place
+    },
+    'shootout/shot': async ({ team, result }) => { await this.needShootout().shot(team, result); },
+    'shootout/undo': async ({ team }) => { await this.needShootout().undo(team); },
+    'shootout/reset': async ({ all }) => { await this.needShootout().reset(all); },
+
     tick: async ({ id, done }) => {
       this.ticks[id] = done;
       this.persist();
@@ -1292,6 +1333,7 @@ export class Panel {
       this.ticks = {};
       this.monitor.log = emptyLog();
       this.book.reset();
+      this.shootout?.reset(true).catch(() => {});
       this.periodScores = [];
       this.periodManual = null;
       this.breakPeriod = null;
