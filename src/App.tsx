@@ -3,6 +3,7 @@ import { AblaufPage } from '@/components/ablauf/ablauf-page';
 import { BreakPage } from '@/components/desktop/break-page';
 import { DebugBar } from '@/components/debug-bar';
 import { DesktopPage } from '@/components/desktop/desktop-page';
+import { GfxPage } from '@/components/desktop/gfx-page';
 import { NachPage } from '@/components/desktop/nach-page';
 import type { DesktopView } from '@/components/desktop/shell';
 import { VorPage } from '@/components/desktop/vor-page';
@@ -19,6 +20,7 @@ import { cn } from '@/lib/utils';
 const TABS = [
   { id: 'ablauf', label: 'VOR' },
   { id: 'live', label: 'LIVE' },
+  { id: 'grafik', label: 'GRAFIK' },
   { id: 'pause', label: 'PAUSE' },
   { id: 'nach', label: 'NACH' },
 ] as const;
@@ -42,6 +44,7 @@ export default function App() {
   const ready = !!state && state.streaming && state.pre.checklist.every((c) => c.done);
   const view: DesktopView = hash === 'nach' ? 'nach'
     : hash === 'pause' ? 'pause'
+    : hash === 'grafik' ? 'grafik'
     : hash === 'live' ? 'live'
     : hash === 'vor' || hash === 'ablauf' ? 'vor'
     : state && state.now < state.pre.kickoff && !ready ? 'vor' : 'live';
@@ -78,7 +81,7 @@ export default function App() {
       <div className="flex h-dvh flex-col">
         {banner}
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {view === 'vor' ? <VorPage state={state} /> : view === 'pause' ? <BreakPage state={state} /> : view === 'nach' ? <NachPage state={state} /> : <DesktopPage state={state} marking={marking} />}
+          {view === 'vor' ? <VorPage state={state} /> : view === 'grafik' ? <GfxPage state={state} /> : view === 'pause' ? <BreakPage state={state} /> : view === 'nach' ? <NachPage state={state} /> : <DesktopPage state={state} marking={marking} />}
         </div>
         {debug && <DebugBar className="h-[38dvh] shrink-0" />}
         <Toaster position="top-center" />
@@ -86,11 +89,12 @@ export default function App() {
     );
   }
 
-  const tab = hash === 'nach' ? 'nach' : hash === 'pause' ? 'pause' : hash === 'ablauf' || hash === 'vor' ? 'ablauf' : 'live';
+  const tab = hash === 'nach' ? 'nach' : hash === 'grafik' ? 'grafik' : hash === 'pause' ? 'pause' : hash === 'ablauf' || hash === 'vor' ? 'ablauf' : 'live';
   return (
     <div className="mx-auto flex h-dvh max-w-[480px] flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
       {state ? (
         tab === 'live' ? <LivePage state={state} marking={marking} />
+          : tab === 'grafik' ? <div className="min-h-0 flex-1 overflow-y-auto"><GfxPage state={state} embedded /></div>
           : tab === 'pause' ? <div className="min-h-0 flex-1 overflow-y-auto"><BreakPage state={state} embedded /></div>
           : tab === 'nach' ? <div className="min-h-0 flex-1 overflow-y-auto"><NachPage state={state} embedded /></div>
           : <AblaufPage state={state} />
@@ -104,14 +108,14 @@ export default function App() {
       {banner}
       {debug && <DebugBar className="h-[45dvh] shrink-0" />}
 
-      <nav aria-label="Phase" className="grid h-14 shrink-0 grid-cols-4 border-t">
+      <nav aria-label="Phase" className="grid h-14 shrink-0 grid-cols-5 border-t">
         {TABS.map((t) => (
           <a
             key={t.id}
             href={`#${t.id}`}
             aria-current={tab === t.id ? 'page' : undefined}
             className={cn(
-              'flex items-center justify-center border-t-[3px] border-transparent text-[13px] font-medium tracking-widest text-muted-foreground',
+              'flex items-center justify-center border-t-[3px] border-transparent text-[11px] font-medium tracking-wider text-muted-foreground',
               tab === t.id && 'border-primary font-black text-foreground',
             )}
           >

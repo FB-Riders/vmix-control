@@ -48,6 +48,10 @@ dropped frames or the Hub's status, so those are not shown.
 ## On-screen graphics (Einblender)
 
 The EINBLENDER screen replaces TCunihockey for everything except the match clock, which comes from the scoreboard.
+It is grouped by vMix overlay channel: MATCHUHR (with the penalty shoot-out display, which takes its place),
+EINBLENDER, SPONSOREN and LIGA-LOGOS. Each group's heading says what is on its channel right now and has the
+button to put it on or take it off.
+
 Load the game's `game-config.txt` there (the TCunihockey format written by <https://www.unihockey.live/generator>;
 UTF-8, UTF-16 and ANSI files are read). The panel then fills the league's vMix titles and fades them in on one
 overlay channel, one at a time:

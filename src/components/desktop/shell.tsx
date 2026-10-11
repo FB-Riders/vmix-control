@@ -8,10 +8,11 @@ import { useNow } from '@/hooks/use-now';
 import { hhmmss } from '@/lib/time';
 import { cn } from '@/lib/utils';
 
-export type DesktopView = 'vor' | 'live' | 'pause' | 'nach';
+export type DesktopView = 'vor' | 'live' | 'grafik' | 'pause' | 'nach';
 const VIEWS: { id: DesktopView; label: string }[] = [
   { id: 'vor', label: 'VOR DEM SPIEL' },
   { id: 'live', label: 'LIVE' },
+  { id: 'grafik', label: 'EINBLENDER' },
   { id: 'pause', label: 'PAUSE' },
   { id: 'nach', label: 'NACH DEM SPIEL' },
 ];
@@ -19,7 +20,7 @@ const VIEWS: { id: DesktopView; label: string }[] = [
 /** The phases of a match day as tabs across the top. */
 function PhaseTabs({ view, streaming }: { view: DesktopView; streaming: boolean }) {
   return (
-    <nav aria-label="Phase" className="grid grid-cols-4 border-b">
+    <nav aria-label="Phase" className="grid grid-cols-5 border-b">
       {VIEWS.map((v, i) => (
         <a
           key={v.id}
