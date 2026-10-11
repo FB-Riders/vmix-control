@@ -1,5 +1,6 @@
 import type { PanelState } from '@shared/state';
 import { Caption } from '@/components/caption';
+import { OverlayStrip } from '@/components/overlays';
 import { Indicator } from '@/components/live/status-header';
 import { Badge } from '@/components/ui/badge';
 import { setDebugOpen, useDebugOpen } from '@/hooks/use-debug';
@@ -77,11 +78,12 @@ export function DesktopShell({ state, view, header, footer, children, embedded }
           <Indicator label="STREAM" on={state.streaming} />
           <Indicator label="REC" on={state.recording} />
           <Indicator label="REPLAY" on={state.replayRecording} />
-          {state.logos && <Indicator label="LOGOS" on={state.logos.visible} />}
           {health.loudness !== null && <span className="tabular-nums">TON ≈ {health.loudness.toFixed(1)} LUFS</span>}
           <span className="text-[15px] font-semibold text-foreground tabular-nums">{hhmmss(now)}</span>
         </div>
       </header>
+
+      <OverlayStrip overlays={state.overlays} className="px-6 py-2.5" />
 
       <div
         role="status"

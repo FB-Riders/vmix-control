@@ -12,6 +12,8 @@ Mobile control surface for vMix. Runs on the vMix computer; every phone in the s
 `dist/` is the ready-built app and has no install step. The console lists all vMix inputs at start and flags
 names in `config.json` that vMix does not know; the same warnings show at the bottom of the run-down screen.
 
+Under the header every screen has the row **IM BILD**: one entry per vMix overlay channel (match clock, Einblender, sponsor, logos), lit while something is on it and saying what, e.g. the goal graphic's player or the sponsor's name. It is read from vMix, so it is also right when something was switched in vMix itself. A channel the panel took off for a replay, the highlights or the break says that it comes back by itself.
+
 ## Views
 
 - **Phone** (narrow screens): LIVE and VOR SPIEL · PAUSE tabs. Alerts from the watchdogs show above the tab bar.
@@ -140,7 +142,7 @@ ends up in vMix's recording folder. Clip lengths come from vMix, the scene lengt
 | `replay.hideScoreboard` | Take the scoreboard overlay off while a replay plays and put it back afterwards. |
 | `audio` | `sources` are the inputs the SPIEL / PAUSE buttons switch (`role`: `commentary` / `atmo`). `music` is a background music input with its own play / pause control. `breakVideo` names the break video; the PAUSE screen can swap its sound for the music (applied by the `breakSound` panel step). `loudnessTarget`, `loudnessTolerance`, `loudnessOffset`, `commentaryOverAtmo` drive the loudness watchdog. |
 | `sponsor` | The sponsor overlay. `inputs[0]` is the league's sponsor title; `list` holds up to eight sponsors (`label`, `title` above the logo, `picture` = full path of the logo on the vMix computer) that are put into it one at a time, `order` the automatic rotation (positions in `list`, repeats allowed). Automatic: a sponsor every `intervalSec` (fade-in to fade-in) for `durationSec`; swiss unihockey asks for 8 s shown and 170 s pause. It waits while a replay runs and takes a shown sponsor off when one starts. Loading TCunihockey's system config on the Einblender screen (`[Sponsor01]`–`[Sponsor08]`, `[SponsorAuto]`) replaces `list`, `order` and the times. With an empty list the inputs are faded in as they are, in turn. |
-| `logos` | League logo inputs and their overlay channels. All of them must be on for LOGOS ● and the controlling. |
+| `logos` | League logo inputs and their overlay channels. All of them must be on for the controlling. |
 | `schedules` | Run-downs. The first one is the pre-game run-down, its anchor is the kickoff. `at` is relative to the anchor (`-08:00` = 8 min before). An `action` is a list of calls (below), with `"auto": true` it runs by itself. A `start` block gives the run-down a one-tap start button (PAUSE STARTEN) that sets the anchor to now + `minutes` and runs its calls; an `end` block gives it a one-tap way out (ZURÜCK ZUM SPIEL). |
 | `preGame` | `streamLeadMinutes`, `onStreamStart` (calls STREAM STARTEN runs first, e.g. mute the microphones and start music), `recordGame` (default of the "Spiel lokal aufnehmen" switch), the `reminder` text, the `emergency` card and the `checklist`. Checklist items with `auto` (`cams`, `logos`) are ticked by the panel. |
 | `controlling` | The controlling list. `check` is one of `streamLead`, `onAir` (input was on program; optionally in the n-th `round` of a `schedule`), `logos`, `audio`, `stalls`, `noInterruption`, `videoExported`, `ticks`. `post: true` shows the item only after the game. |

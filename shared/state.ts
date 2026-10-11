@@ -200,6 +200,15 @@ export interface GfxState {
   overlay: number;
 }
 
+/** One vMix overlay channel the panel uses, or that has something on it. */
+export interface OverlayState {
+  channel: number;
+  role: string; // what the channel is for, e.g. "Matchuhr"; empty if the panel does not use it
+  on: boolean; // vMix shows an input on it right now
+  text: string; // what is on it, or (taken off for a replay) what comes back; empty if nothing
+  paused: boolean; // taken off by the panel for a replay, the highlights or the break; comes back by itself
+}
+
 export interface PanelState {
   now: number; // server clock, epoch ms
   connected: boolean; // server reaches vMix
@@ -207,6 +216,7 @@ export interface PanelState {
   recording: boolean;
   replayRecording: boolean;
   programTitle: string;
+  overlays: OverlayState[]; // as vMix shows them, also if switched in vMix itself
   cams: CamState[];
   score: Score | null;
   replay: ReplayState;

@@ -1,6 +1,7 @@
 import type { PanelState } from '@shared/state';
 import { AudioPresetButton, MusicButton } from '@/components/audio';
 import { Caption } from '@/components/caption';
+import { OverlayStrip } from '@/components/overlays';
 import { MarkButtons, PeriodSelect } from '@/components/replay/mark-buttons';
 import { ReplayList } from '@/components/replay/replay-list';
 import { SponsorButton } from '@/components/sponsor';
@@ -16,6 +17,7 @@ export function LivePage({ state, marking }: { state: PanelState; marking: Marki
   return (
     <>
       <StatusHeader state={state} />
+      <OverlayStrip overlays={state.overlays} className="gap-x-3 px-4 py-2 text-[11px]" />
       <main className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3">
         <section className="flex flex-col gap-1.5">
           <Caption className="font-black text-primary">LIVE · 1 Klick = sofort auf Sendung</Caption>

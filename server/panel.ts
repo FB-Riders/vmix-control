@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { ActionInput, ActionName, ActionResult, GfxRequest } from '../shared/actions';
 import type { DebugEntry, DebugInfo, DebugKind } from '../shared/debug';
-import type { ControllingItem, PanelState, ScheduleState, Score, SimState, Tick, VideoState } from '../shared/state';
+import type { ControllingItem, GfxState, OverlayState, PanelState, ScheduleState, Score, SimState, SponsorState, Tick, VideoState } from '../shared/state';
 import type { Config, VmixCall } from './config';
 import { PanelError } from './errors';
 import { Graphics, parseIni } from './graphics';
@@ -476,6 +476,37 @@ export class Panel {
     });
   }
 
+  /** What is on each overlay channel, as vMix reports it; named the way the operator knows it. */
+  private overlayStates(gfx: GfxState | null, sponsor: SponsorState | null): OverlayState[] {
+    const { cfg, vm } = this;
+    const clock = cfg.scoreboard ? cfg.scoreboard.overlay ?? 1 : 0;
+    const roles = new Map<number, string>();
+    for (const l of cfg.logos) roles.set(l.overlay, 'Logos');
+    if (cfg.sponsor?.inputs.length) roles.set(cfg.sponsor.overlay, 'Sponsor');
+    if (cfg.graphics) roles.set(cfg.graphics.overlay, 'Einblender');
+    if (clock) roles.set(clock, 'Matchuhr');
+    const plain = (title: string) => title.replace(/\.\w+$/, '');
+    const name = (channel: number, key: string | number): string => {
+      const inp = vm?.inputs.find((i) => i.key === key || i.number === key);
+      if (!inp) return '';
+      if (channel === clock && inp === this.findInput(cfg.scoreboard?.input)) return 'Matchuhr';
+      if (channel === clock && this.shootout && inp === this.findInput(this.shootout.input)) return 'Penalty-Schiessen';
+      if (channel === cfg.graphics?.overlay && gfx?.live) return gfx.live.summary;
+      if (channel === cfg.sponsor?.overlay && cfg.sponsor.inputs.some((i) => this.findInput(i) === inp)) return sponsor?.list.find((x) => x.nr === sponsor.live)?.label ?? 'Sponsor';
+      return cfg.logos.find((l) => l.overlay === channel && this.findInput(l.input) === inp)?.name ?? plain(inp.title);
+    };
+    const channels = new Set([...roles.keys(), ...Object.entries(vm?.overlays ?? {}).filter(([, n]) => n).map(([ch]) => Number(ch))]);
+    return [...channels].sort((a, b) => a - b).map((channel) => {
+      const number = vm?.overlays[channel] ?? 0;
+      const hidden = this.hiddenOverlays.find((o) => o.channel === channel)?.input ?? (channel === clock ? this.clockHidden : null);
+      return {
+        channel, role: roles.get(channel) ?? '', on: !!number,
+        text: number ? name(channel, number) : hidden ? name(channel, hidden) : '',
+        paused: !number && !!hidden,
+      };
+    });
+  }
+
   private warnings(): string[] {
     if (!this.vm) return [];
     const { cfg } = this;
@@ -624,12 +655,15 @@ export class Panel {
     const logos = this.logoStates();
     const ctx = this.monitorContext(now);
     const kickoff = this.kickoff();
+    const gfx = this.gfx ? this.gfx.view(this.scoreText(), this.periodResults()) : null;
+    const sponsor = this.sponsors && cfg.sponsor?.inputs.length ? this.sponsors.view() : null;
     return {
       connected: !!vm,
       streaming: !!vm?.streaming,
       recording: !!vm?.recording,
       replayRecording: this.replayRecording(),
       programTitle: active?.title ?? '',
+      overlays: this.overlayStates(gfx, sponsor),
       cams: cfg.cams.map((c) => {
         const inp = this.findInput(c.input);
         return { id: c.id, role: c.role, program: !!inp && inp === active, preview: !!inp && inp === preview };
@@ -660,11 +694,11 @@ export class Panel {
         ? { sources, preset: sources.every((s) => s.on) ? 'game' : sources.every((s) => !s.on) ? 'pause' : null }
         : null,
       music: this.musicState(),
-      gfx: this.gfx ? this.gfx.view(this.scoreText(), this.periodResults()) : null,
+      gfx,
       scoreboard: this.board ? { ...this.board.view(), onAir: this.clockOnAir() } : null,
       shootout: this.shootout?.view() ?? null,
       breakSound: cfg.audio?.music && cfg.audio.breakVideo ? { music: this.breakMusic } : null,
-      sponsor: this.sponsors && cfg.sponsor?.inputs.length ? this.sponsors.view() : null,
+      sponsor,
       logos: logos.length ? { visible: logos.every((l) => l.visible) } : null,
       health: {
         watches: this.monitor.watches(logos.length > 0),
