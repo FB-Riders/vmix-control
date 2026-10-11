@@ -4,15 +4,18 @@ import { act } from '@/lib/api';
 import { KEYS, penaltyKey } from '@/lib/format';
 import type { Marking } from './use-marking';
 
-/** Keyboard control for the desktop view. Keys follow the order of the buttons on screen. */
-export function useHotkeys(state: PanelState | null, marking: Marking, enabled: boolean) {
+/**
+ * Keyboard control for the desktop view. Keys follow the order of the buttons on screen.
+ * `scope`: "live" = everything, "break" = only what the break screen shows (sponsor, audio), null = off.
+ */
+export function useHotkeys(state: PanelState | null, marking: Marking, scope: 'live' | 'break' | null) {
   // The listener is registered once; it reads the latest state through this ref.
   const latest = useRef({ state, marking });
   latest.current = { state, marking };
 
   useEffect(() => {
-    if (!enabled) return;
-    const at = (keys: readonly string[], key: string) => keys.indexOf(key);
+    if (!scope) return;
+    const at = (keys: readonly string[], key: string) => (scope === 'live' ? keys.indexOf(key) : -1);
 
     function onKey(e: KeyboardEvent) {
       const { state, marking } = latest.current;
@@ -38,7 +41,7 @@ export function useHotkeys(state: PanelState | null, marking: Marking, enabled: 
 
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [enabled]);
+  }, [scope]);
 }
 
 /**

@@ -64,7 +64,7 @@ export default function App() {
     wasBreak.current = breakActive;
   }, [breakActive]);
 
-  useHotkeys(state, marking, desktop && view === 'live');
+  useHotkeys(state, marking, !desktop ? null : view === 'live' ? 'live' : view === 'pause' ? 'break' : null);
   useGfxHotkeys(state, desktop && view === 'grafik');
 
   const problem = !online ? 'KEINE VERBINDUNG ZUM REGIE-SERVER' : state && !state.connected ? 'KEINE VERBINDUNG ZU VMIX' : null;

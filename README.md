@@ -22,7 +22,7 @@ Under the header every screen has the row **IM BILD**: one entry per vMix overla
     the run-down to the bully, the checklist. Shown by default before kickoff; switches to Live once the stream runs
     and everything is ticked. Click "Spielbeginn" to set the kickoff time.
   - **Live**: cameras, replays, audio, run-down, controlling list. Keyboard: `Q W E` live, `A S D` preview; replays under the right hand:
-    `U I O` mark replay, `H J K L` replay type; `G` sponsor, `N M` audio game / break. Shortcuts only work while the browser
+    `U I O` mark replay, `H J K L` replay type; `G` sponsor, `N M` audio game / break (these three also on the Pause screen). Shortcuts only work while the browser
     window has focus, not while you are working in vMix.
   - **Pause**: choose the break length, PAUSE STARTEN, then ZURÜCK ZUM SPIEL when play resumes (the `end` block of
     the break run-down); in between the countdown, audio, highlights and sponsors. The panel switches to this screen
