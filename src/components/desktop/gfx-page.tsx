@@ -10,6 +10,7 @@ import { SponsorPanel } from '@/components/sponsor';
 import { Input } from '@/components/ui/input';
 import { useNow } from '@/hooks/use-now';
 import { act } from '@/lib/api';
+import { GFX_KEYS, penaltyKey } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { DesktopShell, Label } from './shell';
 
@@ -116,6 +117,10 @@ function Team({ side, team, gfx, manual }: { side: GfxSide; team: GfxTeam; gfx: 
   );
 }
 
+function Key({ keys, children }: { keys: string; children: string }) {
+  return <span><span className="font-semibold text-foreground">{keys}</span> {children}</span>;
+}
+
 /** Everything that goes on one vMix overlay channel, under a heading that says what the channel shows right now. */
 function Group({ channel, title, overlays, action, className, children }: { channel: number; title: string; overlays: OverlayState[]; action?: React.ReactNode; className?: string; children?: React.ReactNode }) {
   const o = overlays.find((x) => x.channel === channel);
@@ -182,6 +187,7 @@ export function GfxPage({ state, embedded }: { state: PanelState; embedded?: boo
   const teams = !!gfx.home && !!gfx.away;
   const clockChannel = shootout?.overlay ?? overlays.find((o) => o.role === 'Matchuhr')?.channel ?? 1;
   const logoChannel = overlays.find((o) => o.role === 'Logos')?.channel;
+  const clockPenalties = gfx.penalties.map(penaltyKey).filter(Boolean).join(' ');
   const left = 'min-[1000px]:col-start-1';
   const small = cn('h-9 shrink-0 px-2.5 text-[11px]', soft);
   const config = (
@@ -206,7 +212,21 @@ export function GfxPage({ state, embedded }: { state: PanelState; embedded?: boo
       state={state}
       view="grafik"
       embedded={embedded}
-      footer={<span>Jede Gruppe ist ein Overlay von vMix: pro Overlay ist immer nur eines aufs Mal im Bild. Die Kopfzeile der Gruppe sagt, was gerade eingeblendet ist.</span>}
+      footer={embedded ? <span>Jede Gruppe ist ein Overlay von vMix: pro Overlay ist immer nur eines aufs Mal im Bild.</span> : (
+        <>
+          <Key keys={GFX_KEYS.hide}>Einblender aus</Key>
+          <Key keys={GFX_KEYS.next}>Starting 6 weiter</Key>
+          {scoreboard && <Key keys={GFX_KEYS.clock}>Matchuhr ein / aus</Key>}
+          {scoreboard?.manual && (
+            <>
+              <Key keys={GFX_KEYS.run}>Uhr Start / Stopp</Key>
+              <Key keys={GFX_KEYS.second}>±1 s, mit ⇧ ±10 s</Key>
+              <Key keys={`${GFX_KEYS.home} ${GFX_KEYS.away}`}>Tor Heim / Gast, mit ⇧ ein Tor weg</Key>
+              {clockPenalties && <Key keys={clockPenalties}>Strafe Heim auf die Uhr, mit ⇧ Gast</Key>}
+            </>
+          )}
+        </>
+      )}
     >
       {/* Wide: the Einblender (overlay 2) fill the right two thirds, the other overlays stack on the left. */}
       <div className="grid items-start gap-x-6 gap-y-8 min-[1000px]:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] min-[1000px]:grid-rows-[auto_auto_auto_auto_1fr]">

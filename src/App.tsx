@@ -10,7 +10,7 @@ import { VorPage } from '@/components/desktop/vor-page';
 import { LivePage } from '@/components/live/live-page';
 import { Toaster } from '@/components/ui/sonner';
 import { useDebugOpen } from '@/hooks/use-debug';
-import { useHotkeys } from '@/hooks/use-hotkeys';
+import { useGfxHotkeys, useHotkeys } from '@/hooks/use-hotkeys';
 import { useMarking } from '@/hooks/use-marking';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { usePanel } from '@/hooks/use-panel';
@@ -65,6 +65,7 @@ export default function App() {
   }, [breakActive]);
 
   useHotkeys(state, marking, desktop && view === 'live');
+  useGfxHotkeys(state, desktop && view === 'grafik');
 
   const problem = !online ? 'KEINE VERBINDUNG ZUM REGIE-SERVER' : state && !state.connected ? 'KEINE VERBINDUNG ZU VMIX' : null;
   const banner = problem && (

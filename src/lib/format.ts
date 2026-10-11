@@ -12,3 +12,20 @@ export const KEYS = {
   audioGame: 'N',
   audioPause: 'M',
 } as const;
+
+// Keyboard layout of the Einblender screen. With Shift a key does the opposite or acts for the away team.
+export const GFX_KEYS = {
+  run: 'Leertaste', // clock start / stop
+  second: '← →', // game time -1 s / +1 s, with Shift 10 s
+  home: 'H', // goal for the home team, with Shift one off
+  away: 'G',
+  clock: 'M', // match clock on / off
+  next: 'N', // starting six: next player
+  hide: 'Esc', // Einblender off
+} as const;
+
+/** Key that starts a penalty of this kind on the clock: its minutes ("2'" -> 2, "2'+2'" -> 4). Shift = away team. */
+export function penaltyKey(label: string): string | null {
+  const minutes = (label.match(/\d+/g) ?? []).reduce((sum, n) => sum + Number(n), 0);
+  return minutes >= 1 && minutes <= 9 ? String(minutes) : null;
+}

@@ -75,6 +75,11 @@ period, score and two penalties per team (they run with the game time and vanish
 set `stopOnGoal` to `true` to have a goal stop it. Switched off, the panel writes nothing into the title any more. Do not run both at once: if the
 scoreboard link still writes, the two overwrite each other.
 
+Keyboard on the desktop (listed at the bottom of the screen): `Esc` takes the graphic off, `N` brings on the next
+player of the starting six, `M` puts the match clock on or off. With the clock by hand: space starts and stops it,
+`←` `→` correct the time by 1 s (10 s with Shift), `H` / `G` count a goal for home / away (Shift takes one off),
+and `2` `4` `5` start a 2', 2'+2' or 5' penalty on the clock for the home team (Shift: away team).
+
 Goal, penalty, name and best player graphics go off by themselves after 8 s (`graphics.autoHideSec`, kind → seconds;
 add e.g. `"timeout": 8`, or remove an entry to keep that graphic on). All others stay until AUSBLENDEN.
 
