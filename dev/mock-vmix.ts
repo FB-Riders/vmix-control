@@ -5,9 +5,10 @@ import http from 'node:http';
 interface MockInput { title: string; type: string; text?: Record<string, string>; audio?: number; muted?: boolean; duration?: number; number: number; key: string }
 
 const inputs: MockInput[] = ([
-  { title: 'CAM L', type: 'Capture' },
-  { title: 'CAM M', type: 'Capture', audio: 0.04 },
-  { title: 'CAM R', type: 'Capture' },
+  // Named as in the club's vMix preset, so config.json fits without changes.
+  { title: 'Links', type: 'Capture' },
+  { title: 'Haupt', type: 'Capture', audio: 0.04 },
+  { title: 'Rechts', type: 'Capture' },
   { title: 'Replay', type: 'Replay' },
   { title: 'Replay B', type: 'ReplayPreview' },
   { title: 'Scoreboard', type: 'GT', text: { 'ScoreHome.Text': '2', 'ScoreAway.Text': '1', 'Period.Text': '2. Drittel', 'Clock.Text': '08:34', 'HomeName.Text': 'FB Riders', 'AwayName.Text': 'Gast' } },
@@ -23,7 +24,7 @@ const inputs: MockInput[] = ([
   { title: 'Liga-Trailer Short', type: 'Video', duration: 10000 },
   { title: 'Mobiliar-Clip', type: 'Video', duration: 12000 },
   { title: 'Lidl-Clip', type: 'Video', duration: 12000 },
-  { title: 'Mischpult', type: 'Audio', audio: 0.12 },
+  { title: 'Audio UR44C Input 1+2', type: 'Audio', audio: 0.12 },
   { title: 'Highlights - Music', type: 'AudioFile' },
   { title: 'Intro L-UPL.mp4', type: 'Video', duration: 27072 },
   { title: 'Only Women 4k v1.mp4', type: 'Video', duration: 4032 },
@@ -33,7 +34,6 @@ const inputs: MockInput[] = ([
   { title: 'mob_jubel_web_D.mp4', type: 'Video', duration: 10000 },
   { title: 'General Music - 4. Never Be The Same.wav', type: 'VideoList', duration: 227894 },
   { title: 'Highlights - Sound - Ice and Flames.wav', type: 'AudioFile' },
-  { title: 'Haupt', type: 'Capture', audio: 0.04 },
 ] as Omit<MockInput, 'number' | 'key'>[]).map((i, n) => ({ ...i, number: n + 1, key: `00000000-0000-0000-0000-${String(n + 1).padStart(12, '0')}` }));
 
 const s = { active: 2, preview: 1, streaming: false, recording: false, replayRec: true, events: 0, overlays: [0, 0, 0, 0] };
