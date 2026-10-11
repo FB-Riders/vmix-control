@@ -3,11 +3,12 @@ export const camsLabel = (cams: string[]) => (cams.length === 1 ? `nur ${cams[0]
 
 // Keyboard layout of the desktop view, by position in the respective row.
 export const KEYS = {
-  program: ['F1', 'F2', 'F3', 'F4'],
-  preview: ['1', '2', '3', '4'],
-  mark: ['Q', 'W', 'E', 'R'],
-  type: ['A', 'S', 'D', 'F'],
+  program: ['Q', 'W', 'E', 'R'],
+  preview: ['A', 'S', 'D', 'F'],
+  // Replays under the right hand: mark in the top row, then the type in the row below.
+  mark: ['U', 'I', 'O', 'P'],
+  type: ['H', 'J', 'K', 'L'],
   sponsor: 'G',
-  audioGame: 'H',
-  audioPause: 'J',
+  audioGame: 'N',
+  audioPause: 'M',
 } as const;
