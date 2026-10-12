@@ -136,7 +136,7 @@ export class Panel {
     const { replay } = cfg;
     this.book = new ReplayBook((params) => vmix.call(params), replay.periods.map((p) => p.tab), replay.highlightTab, replay.seconds, sameDay ? saved.book : undefined);
     this.periodManual = sameDay ? saved.periodManual ?? null : null;
-    this.gfx = cfg.graphics ? new Graphics(cfg.graphics, (params) => vmix.call(params), (input) => this.ref(input)) : null;
+    this.gfx = cfg.graphics ? new Graphics(cfg.graphics, (params) => vmix.call(params), (input) => this.ref(input), (input) => this.findInput(input)?.colors ?? []) : null;
     const sb = cfg.scoreboard;
     this.clockTitle = sb ? new ClockTitle(sb.input, sb.manual.penaltyColor, (params) => vmix.call(params), (input) => this.ref(input)) : null;
     this.board = sb && this.clockTitle ? new ManualScoreboard(sb.manual, this.clockTitle, () => this.persist(), sameDay ? saved.scoreboard : undefined) : null;

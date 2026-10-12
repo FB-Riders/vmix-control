@@ -108,6 +108,9 @@ and `2` `4` `5` start a 2', 2'+2' or 5' penalty on the clock for the home team (
 Goal, penalty, name and best player graphics go off by themselves after 8 s (`graphics.autoHideSec`, kind → seconds;
 add e.g. `"timeout": 8`, or remove an entry to keep that graphic on). All others stay until AUSBLENDEN.
 
+The bar behind a title's top and bottom line (`RectTop` / `RectBottom`) is shown in `graphics.barColor` while the
+line has text and made transparent while it is empty; the titles leave that to the sender.
+
 Names are written in capitals; a player whose name is filed under `00` gets the top scorer icon. Team logos are
 only set if `graphics.logoPath` names the folder with `<TeamShort>.png` on the vMix computer. Labels
 (`graphics.labels`), penalty lengths and shortcut texts are in `config.json`. `dev/examples/` holds the league's

@@ -134,6 +134,9 @@ const configSchema = z.object({
     opener: z.object({ top: z.string(), main: z.string(), bottom: z.string() }).default({ top: '{date}', main: '{time}', bottom: '{location}' }),
     penalties: z.array(z.string()).default(["2'", "2'+2'", "5'", "10'"]),
     shortcuts: z.array(z.string()).default([]),
+    // The bar behind the top and bottom line of a title (RectTop / RectBottom): shown with this colour while the
+    // line has text, made transparent while it is empty. Colours as the titles hold them: red, green, blue, opacity.
+    barColor: z.string().default('#FFF000FF'),
     // Graphics that go off by themselves, kind -> seconds on screen. All others stay until they are taken off.
     autoHideSec: z.record(z.string(), z.number().positive()).default({ goal: 8, penalty: 8, name: 8, bestPlayer: 8 }),
     // Penalty shoot-out display: takes the match clock's place on its overlay channel. Colours of the five circles per team.

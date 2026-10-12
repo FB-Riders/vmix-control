@@ -10,6 +10,7 @@ export interface VmixInput {
   duration: number; // ms, 0 for live sources
   position: number; // ms into the clip
   fields: Record<string, string>; // title text fields by name, e.g. "Score.Text"
+  colors: string[]; // names of the title's colour fields, e.g. "RectTop.Fill.Color"
   replay: Record<string, string> | null; // attributes of <replay>, only on the Replay input
   layers: string[]; // keys of the inputs layered into this one (multi view), e.g. a video inside a frame
   muted: boolean;
@@ -52,6 +53,7 @@ export function parseVmix(xml: string): VmixState {
     for (const t of body.matchAll(/<text\b([^>]*)>([\s\S]*?)<\/text>/g)) fields[attrs(t[1]).name] = decode(t[2]);
     const rp = body.match(/<replay\b([^>]*?)\/?>/);
     inputs.push({ key: a.key, number: Number(a.number), type: a.type, title: a.title, state: a.state ?? '', duration: Number(a.duration) || 0, position: Number(a.position) || 0, fields, replay: rp ? attrs(rp[1]) : null,
+      colors: [...body.matchAll(/<color\b([^>]*)>/g)].map((c) => attrs(c[1]).name).filter(Boolean),
       layers: [...body.matchAll(/<overlay\b([^>]*?)\/?>/g)].map((o) => attrs(o[1]).key).filter(Boolean),
       muted: a.muted === 'True',
       meter: Math.max(Number(a.meterF1) || 0, Number(a.meterF2) || 0),

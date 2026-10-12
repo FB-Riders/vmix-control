@@ -40,6 +40,7 @@ interface Graphic {
 }
 
 const TOPSCORER = '00';
+const HIDDEN = '#00000000';
 const empty = (n: string | undefined) => !n || n === '-';
 
 /**
@@ -102,6 +103,7 @@ export class Graphics {
     private readonly cfg: GraphicsConfig,
     private readonly call: (params: VmixParams) => Promise<void>,
     private readonly ref: (input: string) => string | number,
+    private readonly colors: (input: string) => string[], // colour fields the title has
   ) {}
 
   get loaded(): boolean { return !!this.game; }
@@ -249,6 +251,18 @@ export class Graphics {
   private async fill(g: Graphic): Promise<void> {
     const input = this.ref(this.cfg.titles[g.title]);
     for (const [field, value] of Object.entries(g.text)) await this.call({ Function: 'SetText', Input: input, SelectedName: `${field}.Text`, Value: value });
+    // The top and bottom line sit on a bar of their own. The titles leave it to the sender to show the bar with the
+    // line and to hide it without: a line without its bar is hard to read, a bar without a line is an empty stripe.
+    const has = this.colors(this.cfg.titles[g.title]);
+    for (const line of ['Top', 'Bottom']) {
+      const bar = `Rect${line}.Fill.Color`;
+      if (!(`Txt${line}` in g.text) || !has.includes(bar)) continue;
+      await this.call({ Function: 'SetColor', Input: input, SelectedName: bar, Value: g.text[`Txt${line}`].trim() ? this.cfg.barColor : HIDDEN });
+    }
+    // The box for a personal sponsor stays empty: the panel shows none, and one left on by another program would be an empty frame.
+    for (const box of ['RectSponsBackgr.Fill.Color', 'RectSponsBorder.Fill.Color']) {
+      if (has.includes(box)) await this.call({ Function: 'SetColor', Input: input, SelectedName: box, Value: HIDDEN });
+    }
     for (const [field, file] of Object.entries(g.image ?? {})) if (file) await this.call({ Function: 'SetImage', Input: input, SelectedName: `${field}.Source`, Value: file });
     for (const [field, on] of Object.entries(g.visible ?? {})) await this.call({ Function: on ? 'SetImageVisibleOn' : 'SetImageVisibleOff', Input: input, SelectedName: `${field}.Source` });
   }

@@ -2,7 +2,7 @@
 // Start with: npm run mock   (listens on port 8088)
 import http from 'node:http';
 
-interface MockInput { title: string; type: string; text?: Record<string, string>; audio?: number; muted?: boolean; duration?: number; layers?: string[]; number: number; key: string }
+interface MockInput { title: string; type: string; text?: Record<string, string>; colors?: Record<string, string>; audio?: number; muted?: boolean; duration?: number; layers?: string[]; number: number; key: string }
 
 const inputs: MockInput[] = ([
   // Named as in the club's vMix preset, so config.json fits without changes.
@@ -18,7 +18,7 @@ const inputs: MockInput[] = ([
   { title: 'LUPL-SU_scoreboard_penaltyshooting.gtzip', type: 'GT' },
   // As the scoreboard link leaves it: one digit per field.
   { title: 'LUPL-SU_scoreboard_clock.gtzip', type: 'GT', text: { 'TxtHomeScore.Text': '2', 'TxtAwayScore.Text': '1', 'TxtClockPeriod.Text': '2', 'TxtClockTimeM10.Text': '0', 'TxtClockTimeM01.Text': '8', 'TxtClockTimeT.Text': ':', 'TxtClockTimeS10.Text': '3', 'TxtClockTimeS01.Text': '4', 'TxtHomeName.Text': 'RIDERS', 'TxtAwayName.Text': 'GAST' } },
-  ...['sponsor', 'board', 'league_info', 'team_info', 'team_player_event', 'team_player_name', 'team_lineup_home', 'team_lineup_away', 'team_startingsix'].map((t) => ({ title: `LUPL-SU_${t}.gtzip`, type: 'GT' })),
+  ...['sponsor', 'board', 'league_info', 'team_info', 'team_player_event', 'team_player_name', 'team_lineup_home', 'team_lineup_away', 'team_startingsix'].map((t) => ({ title: `LUPL-SU_${t}.gtzip`, type: 'GT', colors: { 'RectTop.Fill.Color': '#FFF00000', 'RectBottom.Fill.Color': '#FFF00000' } })),
   { title: 'Livestream Pro', type: 'Image' },
   { title: 'Liga-Trailer', type: 'Video', duration: 60000 },
   { title: 'Liga-Trailer Short', type: 'Video', duration: 10000 },
@@ -60,6 +60,7 @@ function xml(): string {
   return `<vmix><version>29.0.0.0</version><inputs>${inputs.map((i) => `
 <input key="${i.key}" number="${i.number}" type="${i.type}" title="${i.title}" state="${i.type !== 'Video' || playingClips.has(i.number) ? 'Running' : 'Paused'}" duration="${i.duration ?? 0}"${audioAttrs(i)}>${i.title}${
     Object.entries(i.text ?? {}).map(([k, v], n) => `<text index="${n}" name="${k}">${v}</text>`).join('')}${
+    Object.entries(i.colors ?? {}).map(([k, v], n) => `<color index="${n}" name="${k}">${v}</color>`).join('')}${
     (i.layers ?? []).map((t, n) => `<overlay index="${n}" key="${inputs.find((x) => x.title === t)?.key ?? ''}" />`).join('')}${
     i.type === 'Replay' ? `<replay live="True" recording="${bool(s.replayRec)}" channelMode="AB" events="${s.events}" />` : ''}</input>`).join('')}
 </inputs><audio><master volume="100" muted="False" meterF1="${masterLevel().toFixed(4)}" meterF2="${masterLevel().toFixed(4)}" /></audio><overlays>${s.overlays.map((o, n) => `<overlay number="${n + 1}">${o || ''}</overlay>`).join('')}</overlays>
@@ -81,6 +82,7 @@ function exec(fn: string, q: URLSearchParams): boolean {
     const name = q.get('SelectedName');
     if (!inp || !name) return false;
     if (fn === 'SetText') inp.text = { ...inp.text, [name]: q.get('Value') ?? '' };
+    if (fn === 'SetColor') inp.colors = { ...inp.colors, [name]: q.get('Value') ?? '' };
   }
   else if (fn === 'TitleBeginAnimation') { if (!inp || !q.get('Value')) return false; }
   else if (fn === 'PreviewInput') { if (!inp) return false; s.preview = inp.number; }
