@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { toast } from 'sonner';
 import type { PanelState } from '@shared/state';
 import { AudioPresetButton, AudioSources, MusicRow } from '@/components/audio';
 import { Caption } from '@/components/caption';
@@ -10,9 +12,31 @@ import type { Marking } from '@/hooks/use-marking';
 import { useNow } from '@/hooks/use-now';
 import { act } from '@/lib/api';
 import { camsLabel, KEYS } from '@/lib/format';
+import { cn } from '@/lib/utils';
 import { isOpen, mmss } from '@/lib/time';
 import { RunDownControls } from './run-down';
 import { DesktopShell, Label } from './shell';
+
+/** Takes the scenes over from vMix Replay's own file, for when the panel has lost its list (new day, lost data). */
+function AdoptReplays() {
+  const [armed, setArmed] = useState(false);
+  async function adopt() {
+    if (!armed) { setArmed(true); setTimeout(() => setArmed(false), 4000); return; }
+    setArmed(false);
+    const r = (await act('replay/adopt'))?.result;
+    if (!r) return;
+    const unknown = r.unknown ? `, ${r.unknown} Highlights ohne Szene` : '';
+    toast.success(`${r.scenes} Szenen übernommen, davon ${r.highlights} Highlights${unknown}. Stand der vMix-Datei: ${r.written} Uhr`);
+  }
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+      <span className="text-xs font-light text-muted-foreground">Liste verloren oder von gestern? vMix kennt die Szenen noch.</span>
+      <Button variant="outline" className={cn('h-8 px-2.5 text-[11px] font-black', armed ? 'border-2 border-primary bg-primary' : 'border-2 border-input bg-transparent')} onClick={adopt}>
+        {armed ? 'LISTE DER REGIE ERSETZEN?' : 'SZENEN AUS VMIX ÜBERNEHMEN'}
+      </Button>
+    </div>
+  );
+}
 
 function Key({ keys, children }: { keys: string; children: string }) {
   return <span><span className="font-semibold text-foreground">{keys}</span> {children}</span>;
@@ -168,6 +192,7 @@ export function DesktopPage({ state, marking }: { state: PanelState; marking: Ma
         <PeriodSelect replay={replay} />
         <MarkButtons replay={replay} marking={marking} recording={state.replayRecording} desktop />
         <Label title="REPLAYS" hint={`vMix-Tabs ${replay.periods.map((p) => p.tab).join(', ')} · ★ = Tab ${replay.highlightTab}`} className="mt-3" />
+        {replay.canAdopt && <AdoptReplays />}
         <ReplayList replay={replay} visible={5} desktop />
         <span className="text-xs leading-relaxed font-light text-muted-foreground">
           Jedes Replay liegt im Tab seines Abschnitts. Tore und ★ werden zusätzlich in den Highlight-Tab kopiert, aus dem am Schluss das Highlight-Video entsteht.

@@ -134,6 +134,15 @@ last event and steps back to the one that is meant. This only stays correct if e
 copied and deleted through the panel alone, and if the tabs are empty when a new game starts ("Neues Spiel" clears
 the panel's book, not vMix).
 
+**Taking the scenes over from vMix.** vMix Replay keeps its own file of its events (`replay2.xml` in the replay
+session folder; `replay.file` in `config.json`). SZENEN AUS VMIX ÜBERNEHMEN on the live screen replaces the panel's
+book with what that file holds, for when the book is lost or from another day: every event of a period tab becomes a
+scene with its length, cameras and type (the event's text), and a scene is a highlight if the highlight tab holds its
+copy (the event with the number after the original's, else one starting at the same moment). The game clock of the
+moment is not in the file; the scene shows the time of day instead. vMix only rewrites the file when an event is
+created or the replay recording starts or stops, so a change made since then is missing. The panel has to run on
+the vMix computer to read it.
+
 ## Preview during sequences
 
 While a sequence runs (pre-game steps, break, back to the game, end of game, highlight video) the panel keeps the
@@ -170,6 +179,7 @@ ends up in vMix's recording folder. Clip lengths come from vMix, the scene lengt
 | `cams[].input` | vMix input name (or number / GUID) of each camera. Anywhere an input is named, `Name*` matches by prefix, which is needed for list inputs whose title includes the current item. `replayCamera` is its camera number 1–8 in vMix Replay. vMix plays the angles of an event in that order, so the camera that should come first needs the lowest number. |
 | `scoreboard` | Title input and its field names for score, period, clock and team names. `overlay` is the overlay channel it runs on. Remove the block if there is none. |
 | `scoreboard.bodet` | Link to the Bodet Scorepad: `enabled`, `mode` (`listen`: the Scorepad connects to this computer; `connect`: the panel dials the interface at `host`), `port` (4001), `staleMs` (5000: no data for this long counts as lost), `overtime` (period field during extra time, `O`), `timeoutGraphic`. Remove the block if another program fills the clock title. |
+| `replay.file` | vMix Replay's own file of its events, for SZENEN AUS VMIX ÜBERNEHMEN. Empty = the button is not shown. |
 | `replay.seconds` | Length of a marked replay (seconds back from live). |
 | `replay.fps` | Frame rate of the vMix project. In and out points are moved in frames, so one second is this many. |
 | `replay.marks` | The mark buttons and which cameras each one keeps in the event. |

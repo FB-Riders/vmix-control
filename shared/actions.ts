@@ -25,6 +25,7 @@ export const actionSchemas = {
   'replay/play': z.object({ id: z.number().int() }),
   'replay/preview': z.object({ id: z.number().int() }),
   'replay/delete': z.object({ id: z.number().int() }),
+  'replay/adopt': z.object({}), // replace the panel's list of scenes with what vMix Replay's own file holds
   'replay/period': z.object({ period: z.number().int().nonnegative().nullable() }), // null = follow the scoreboard
   'break/period': z.object({ period: z.number().int().nonnegative() }),
   'audio/preset': z.object({ preset: z.enum(['game', 'pause']) }),
@@ -87,5 +88,6 @@ export type AudioPreset = ActionInput<'audio/preset'>['preset'];
 interface ActionResults {
   'replay/mark': { id: number; cams: string[] };
   'gfx/import': { game: boolean; sponsors: number }; // what the file held
+  'replay/adopt': { scenes: number; highlights: number; unknown: number; written: string }; // unknown: highlights without a scene; written: when vMix last wrote the file
 }
 export type ActionResult<K extends ActionName> = K extends keyof ActionResults ? ActionResults[K] : void;

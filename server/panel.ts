@@ -7,6 +7,7 @@ import type { Config, VmixCall } from './config';
 import { PanelError } from './errors';
 import { Graphics, parseIni } from './graphics';
 import { emptyLog, type MatchLog, Monitor, type MonitorContext } from './monitor';
+import { parseReplayFile } from './replay-file';
 import { ReplayBook, type ReplayBookData, type Scene } from './replays';
 import { BodetLink } from './bodet/link';
 import { ClockTitle, ManualScoreboard, type ManualScoreboardData } from './scoreboard';
@@ -426,6 +427,9 @@ export class Panel {
     }
   }
 
+  /** vMix Replay's own file of its events, if the panel can read it. */
+  private replayFile(): string { return process.env.REPLAY_FILE ?? this.cfg.replay.file; }
+
   private needBoard(): ManualScoreboard {
     if (!this.board) throw new PanelError('In config.json ist keine Matchuhr hinterlegt (scoreboard)');
     return this.board;
@@ -739,6 +743,7 @@ export class Panel {
         periodFromScoreboard: this.scoreboardPeriod(),
         breakPeriod: this.breakClipPeriod(),
         highlightTab: cfg.replay.highlightTab,
+        canAdopt: !!this.replayFile(),
       },
       audio: sources.length
         ? { sources, preset: sources.every((s) => s.on) ? 'game' : sources.every((s) => !s.on) ? 'pause' : null }
@@ -1224,6 +1229,28 @@ export class Panel {
       } finally {
         this.persist(); // also when a call after the mark failed: the event exists and is in the book
       }
+    },
+
+    'replay/adopt': async () => {
+      const file = this.replayFile();
+      if (!file) throw new PanelError('In config.json ist die Replay-Datei von vMix nicht hinterlegt (replay.file)');
+      if (this.playing) throw new PanelError('Nicht möglich, solange ein Replay läuft');
+      let lists: ReturnType<typeof parseReplayFile>;
+      let written: number;
+      try {
+        lists = parseReplayFile(fs.readFileSync(file, 'utf8'));
+        written = fs.statSync(file).mtimeMs;
+      } catch (e) {
+        throw new PanelError(`Replay-Datei «${file}» nicht lesbar: ${e instanceof Error ? e.message : e}`);
+      }
+      const { replay, cams } = this.cfg;
+      const result = this.book.adopt(lists, (e) => ({
+        time: e.at === null ? '' : hhmm(e.at), // the game clock of the moment is not in the file
+        cams: cams.filter((c) => e.cameras.includes(c.replayCamera)).map((c) => c.id),
+        type: replay.types.includes(e.text) ? e.text : replay.defaultType,
+      }), (type) => replay.autoHighlightTypes.includes(type));
+      this.persist();
+      return { ...result, written: hhmm(written) };
     },
 
     'replay/type': async ({ id, type }) => {

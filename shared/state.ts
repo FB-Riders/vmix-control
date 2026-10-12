@@ -44,6 +44,7 @@ export interface ReplayState {
   periodFromScoreboard: number | null; // what the scoreboard says, if readable
   breakPeriod: number; // period whose scenes the break clip shows
   highlightTab: number;
+  canAdopt: boolean; // vMix Replay's own file is configured: the scenes can be taken over from it
 }
 
 export interface AudioState {

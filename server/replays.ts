@@ -1,4 +1,5 @@
 import { PanelError } from './errors';
+import type { FileEvent } from './replay-file';
 import type { VmixParams } from './vmix';
 
 /** One marked scene. It lives in the event tab of its period and, as a highlight, as a copy in the highlight tab. */
@@ -57,6 +58,48 @@ export class ReplayBook {
   reset(): void {
     this.scenes = [];
     this.tabs = {};
+  }
+
+  /**
+   * Replaces the book with what vMix's own file says its lists hold: one scene per event of a period tab, starred
+   * if the highlight tab holds its copy. A copy is told by its number, the one after its original's (the panel
+   * copies a scene right after marking it or when it is starred), else by starting at the same moment.
+   *
+   * Events of the highlight tab without an original keep their place in the tab under a number no scene has, so
+   * counting back to another event of the tab still hits the right one.
+   */
+  adopt(lists: Record<number, FileEvent[]>, read: (e: FileEvent) => Pick<Scene, 'time' | 'cams' | 'type'>, autoHighlight: (type: string) => boolean): { scenes: number; highlights: number; unknown: number } {
+    const scenes: Scene[] = [];
+    const tabs: Record<number, number[]> = {};
+    const byEvent = new Map<FileEvent, Scene>();
+    let nextId = 1;
+    this.periodTabs.forEach((tab, period) => {
+      for (const e of lists[tab] ?? []) {
+        const scene: Scene = { ...read(e), id: nextId++, period, fav: false, seconds: e.seconds, inShift: 0, outShift: 0 };
+        scenes.push(scene);
+        byEvent.set(e, scene);
+        (tabs[tab] ??= []).push(scene.id);
+      }
+    });
+
+    const free = new Set(byEvent.keys());
+    const near = (a: FileEvent, b: FileEvent, seconds: number) => Math.abs(a.start - b.start) <= seconds;
+    let unknown = 0;
+    for (const copy of lists[this.highlightTab] ?? []) {
+      const original = [...free].find((e) => e.id === copy.id - 1 && near(e, copy, 120)) ?? [...free].find((e) => near(e, copy, 0.5));
+      const scene = original && byEvent.get(original);
+      if (original && scene) {
+        free.delete(original);
+        scene.fav = !autoHighlight(scene.type);
+        (tabs[this.highlightTab] ??= []).push(scene.id);
+      } else {
+        (tabs[this.highlightTab] ??= []).push(-++unknown);
+      }
+    }
+    this.scenes = scenes;
+    this.tabs = tabs;
+    this.nextId = nextId;
+    return { scenes: scenes.length, highlights: this.highlights().length, unknown };
   }
 
   // ---------- reading the model ----------

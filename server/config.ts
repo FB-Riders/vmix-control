@@ -90,6 +90,9 @@ const configSchema = z.object({
       { label: 'Verlängerung', short: 'VL', tab: 14 },
     ]),
     highlightTab: z.number().int().min(1).max(20).default(10),
+    // vMix Replay's own file of its events (replay2.xml in the replay session folder), to take the scenes over from
+    // when the panel has lost its list. Only readable where the panel runs on the vMix computer.
+    file: z.string().default(''),
     autoHighlightTypes: z.array(z.string()).default([]),
     hideScoreboard: z.boolean().default(false),
     highlightMusic: z.string().default(''), // audio input played under the highlight reel
