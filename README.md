@@ -66,7 +66,7 @@ overlay channel, one at a time:
 | Line-up | `lineupHome` / `lineupAway` | `Line1`–`Line4`, `Goal`, coach |
 | Match clock by hand | `scoreboard.input` | not from the game config: see below |
 | Penalty shoot-out | `graphics.shootout.input` | not from the game config: five circles per team, coloured per attempt (`colors.goal` / `miss` / `open`); goes on the match clock's overlay channel in its place, names and score copied from the clock title |
-| Starting six | `startingSix` | first goalie and first line; fades in with the team logo, then the stepper brings on one player at a time (the title's animation pages `Page1`–`Page6`) |
+| Starting six | `startingSix` | the six of `Starting6` in that order (without it: first goalie and first line); fades in with the team logo, then the stepper brings on one player at a time (the title's animation pages `Page1`–`Page6`) |
 
 **Match clock by hand.** Normally the hall's scoreboard fills the clock title. If that link fails, the switch
 "Matchuhr von Hand" on the Einblender screen hands the title to the panel: it carries on from the time, period and

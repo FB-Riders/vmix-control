@@ -16,6 +16,7 @@ interface Team {
   topscorer: string; // name filed under 00; shown with the top scorer icon
   lines: string[][]; // shirt numbers: defender left, defender right, centre, wing left, wing right
   goalies: string[];
+  starting: string[]; // shirt numbers of the starting six as entered (Starting6); may be empty
 }
 
 interface Game {
@@ -76,6 +77,7 @@ function readGame(sections: Record<string, Record<string, string>>): Game {
       players, topscorer: s[TOPSCORER] ?? '',
       lines: [s.Line1, s.Line2, s.Line3, s.Line4].map(list),
       goalies: list(s.Goal),
+      starting: list(s.Starting6),
     };
   };
   const g = sections.game ?? {};
@@ -132,9 +134,10 @@ export class Graphics {
     return { nr: nr as string, name: name.toUpperCase(), top: !!name && name === t.topscorer };
   }
 
-  /** The starting six are the first goalie and the first line. */
+  /** The starting six as the game config names them (Starting6); without that, the first goalie and the first line. */
   private startingSix(t: Team): string[] {
-    return [t.goalies[0], ...(t.lines[0] ?? [])].filter((n) => !empty(n)).slice(0, 6);
+    const named = t.starting.filter((n) => !empty(n));
+    return (named.length ? named : [t.goalies[0], ...(t.lines[0] ?? [])].filter((n) => !empty(n))).slice(0, 6);
   }
 
   /** Short names and logo files of both teams, for the shoot-out display. */
