@@ -147,7 +147,8 @@ export class Panel {
     this.schedule = s?.anchors && cfg.schedules.some((x) => x.id === s.id) ? s : { id: cfg.schedules[0].id, anchors: {}, rounds: {} };
     if (sameDay) this.ticks = saved.ticks ?? {};
     this.recordGame = saved.recordGame ?? cfg.preGame.recordGame;
-    this.breakMusic = saved.breakMusic ?? true;
+    // A choice made on the Pause screen holds for the day; a new day starts with the configured sound.
+    this.breakMusic = (sameDay ? saved.breakMusic : undefined) ?? cfg.audio?.breakSound === 'music';
     this.monitor = new Monitor(cfg, saved.log);
     this.video.speed = cfg.postGame.highlightVideo?.speeds.at(-1) ?? 100;
     vmix.onCall = (params, ms, error) => {

@@ -103,6 +103,7 @@ const configSchema = z.object({
     overlay: z.number().int().min(1).max(8),
     intervalSec: z.number().positive(), // automatic rotation: from one fade-in to the next
     durationSec: z.number().positive(),
+    breakSound: z.enum(['video', 'music']).default('video'), // what a break starts with: the video's own sound, or the video muted under the music list
     // Sponsors put into the first input (the league's sponsor title) one at a time: button label, heading above the
     // logo, full path of the logo on the vMix computer. Empty = the inputs are shown as they are.
     list: z.array(z.object({ label: z.string(), title: z.string().default(''), picture: z.string() })).max(8).default([]),

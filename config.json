@@ -146,6 +146,7 @@
     "commentaryOverAtmo": 10
   },
   "sponsor": {
+    "breakSound": "video",
     "inputs": [
       "LUPL-SU_sponsor.gtzip"
     ],
