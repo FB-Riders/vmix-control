@@ -194,11 +194,14 @@ and the panel's replay list (also needed after a test run on match day).
 ## Development
 
 ```
-npm install
-npm run mock    # fake vMix API on :8088, for working without vMix
-npm run dev     # server on :8090 + Vite with hot reload on :5173
-npm run build   # typecheck, build client to dist/public, bundle server to dist/server.cjs
+pnpm install
+pnpm mock       # fake vMix API on :8088, for working without vMix
+pnpm dev        # server on :8090 + Vite with hot reload on :5173
+pnpm build      # typecheck, build client to dist/public, bundle server to dist/server.cjs
 ```
+
+The package manager is pnpm (`packageManager` in `package.json`; `corepack enable` provides it). `node_modules`
+is laid out flat (`pnpm-workspace.yaml`) because the project lives in a synced folder.
 
 Stack: React 19, TypeScript, Vite, Tailwind CSS 4, shadcn/ui (Radix) on the client; Hono + zod on the server.
 `shared/` holds the action schemas and state types both sides use. State reaches the phones via server-sent events.

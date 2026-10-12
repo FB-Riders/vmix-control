@@ -7,7 +7,7 @@ if errorlevel 1 (
   exit /b 1
 )
 if not exist dist\server.cjs (
-  echo dist\server.cjs fehlt. Bitte zuerst "npm install" und "npm run build" ausfuehren.
+  echo dist\server.cjs fehlt. Bitte zuerst "pnpm install" und "pnpm build" ausfuehren.
   pause
   exit /b 1
 )

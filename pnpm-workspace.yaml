@@ -1,0 +1,4 @@
+# The project lives in a Dropbox folder: a flat node_modules without symlinks syncs without trouble.
+nodeLinker: hoisted
+onlyBuiltDependencies:
+  - esbuild
