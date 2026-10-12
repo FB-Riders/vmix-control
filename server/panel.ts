@@ -376,6 +376,7 @@ export class Panel {
     if (!b?.manual) return;
     const teams = this.gfx?.teams();
     b.names = { home: teams?.home.short ?? '', away: teams?.away.short ?? '' };
+    b.logos = { home: teams?.home.logo ?? '', away: teams?.away.logo ?? '' };
     b.push().catch(() => {});
   }
 

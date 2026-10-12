@@ -417,7 +417,7 @@
   ],
   "graphics": {
     "overlay": 2,
-    "logoPath": "",
+    "logoPath": "C:\\tcunihockey_files\\TeamLogos",
     "titles": {
       "board": "LUPL-SU_board.gtzip",
       "leagueInfo": "LUPL-SU_league_info.gtzip",

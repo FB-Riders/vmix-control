@@ -41,6 +41,7 @@ export class ManualScoreboard {
   private sent: Record<string, string> = {}; // what the title holds, field -> value
   private pushing = false;
   names: Record<GfxSide, string> = { home: '', away: '' }; // short team names; empty = leave the title's names
+  logos: Record<GfxSide, string> = { home: '', away: '' }; // logo files on the vMix computer; empty = leave the title's logos
 
   constructor(
     private readonly cfg: ManualScoreboardConfig,
@@ -201,6 +202,7 @@ export class ManualScoreboard {
     };
     for (const side of SIDES) {
       if (this.names[side]) f[`Txt${cap(side)}Name.Text`] = this.names[side];
+      if (this.logos[side]) f[`Img${cap(side)}Team.Source`] = this.logos[side];
       this.remaining(side, now).forEach((ms, i) => {
         const prefix = `Txt${cap(side)}Pen${i + 1}`;
         const shown = digits(prefix, ms, false);
@@ -224,7 +226,7 @@ export class ManualScoreboard {
       const input = this.ref(this.cfg.input);
       for (const [field, value] of Object.entries(this.fields(now))) {
         if (this.sent[field] === value) continue;
-        await this.call({ Function: field.endsWith('.Color') ? 'SetColor' : 'SetText', Input: input, SelectedName: field, Value: value });
+        await this.call({ Function: field.endsWith('.Color') ? 'SetColor' : field.endsWith('.Source') ? 'SetImage' : 'SetText', Input: input, SelectedName: field, Value: value });
         this.sent[field] = value;
       }
     } finally {
