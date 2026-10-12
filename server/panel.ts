@@ -904,9 +904,10 @@ export class Panel {
     if (!this.sequences && !this.scheduleRunning()) { this.soundApplied = ''; this.soundSeen = { key: '', since: now }; return; }
     const active = this.activeInput();
     const breakVideo = this.findInput(this.cfg.audio?.breakVideo);
+    // The break video is on also when it runs inside another input, e.g. the league's frame around it.
     const want = !active ? ''
       : this.replayOnAir() && this.playing?.id === null ? 'reel'
-      : breakVideo && active === breakVideo ? (this.breakMusic ? 'break:music' : 'break:video')
+      : breakVideo && (active === breakVideo || active.layers.includes(breakVideo.key)) ? (this.breakMusic ? 'break:music' : 'break:video')
       : active.type === 'Video' || active.type === 'VideoList' ? 'clip'
       : ''; // cameras and everything else: hands off
     if (want !== this.soundSeen.key) {

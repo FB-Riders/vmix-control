@@ -2,7 +2,7 @@
 // Start with: npm run mock   (listens on port 8088)
 import http from 'node:http';
 
-interface MockInput { title: string; type: string; text?: Record<string, string>; audio?: number; muted?: boolean; duration?: number; number: number; key: string }
+interface MockInput { title: string; type: string; text?: Record<string, string>; audio?: number; muted?: boolean; duration?: number; layers?: string[]; number: number; key: string }
 
 const inputs: MockInput[] = ([
   // Named as in the club's vMix preset, so config.json fits without changes.
@@ -30,6 +30,7 @@ const inputs: MockInput[] = ([
   { title: 'Only Women 4k v1.mp4', type: 'Video', duration: 4032 },
   { title: 'Intro_Floori_1080p.mp4', type: 'Video', duration: 8000 },
   { title: 'Pausenvideo_FBRiders_Loop_5min.mp4', type: 'Video', duration: 300000 },
+  { title: 'Pause', type: 'Colour', layers: ['Pausenvideo_FBRiders_Loop_5min.mp4'] }, // the league's frame around the break video
   { title: 'Presenter - Lidl Schweiz Partner Unihockey Women v2.mp4', type: 'Video', duration: 6000 },
   { title: 'mob_jubel_web_D.mp4', type: 'Video', duration: 10000 },
   { title: 'General Music - 4. Never Be The Same.wav', type: 'VideoList', duration: 227894 },
@@ -59,6 +60,7 @@ function xml(): string {
   return `<vmix><version>29.0.0.0</version><inputs>${inputs.map((i) => `
 <input key="${i.key}" number="${i.number}" type="${i.type}" title="${i.title}" state="${i.type !== 'Video' || playingClips.has(i.number) ? 'Running' : 'Paused'}" duration="${i.duration ?? 0}"${audioAttrs(i)}>${i.title}${
     Object.entries(i.text ?? {}).map(([k, v], n) => `<text index="${n}" name="${k}">${v}</text>`).join('')}${
+    (i.layers ?? []).map((t, n) => `<overlay index="${n}" key="${inputs.find((x) => x.title === t)?.key ?? ''}" />`).join('')}${
     i.type === 'Replay' ? `<replay live="True" recording="${bool(s.replayRec)}" channelMode="AB" events="${s.events}" />` : ''}</input>`).join('')}
 </inputs><audio><master volume="100" muted="False" meterF1="${masterLevel().toFixed(4)}" meterF2="${masterLevel().toFixed(4)}" /></audio><overlays>${s.overlays.map((o, n) => `<overlay number="${n + 1}">${o || ''}</overlay>`).join('')}</overlays>
 <preview>${s.preview}</preview><active>${s.active}</active>

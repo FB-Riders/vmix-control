@@ -332,7 +332,7 @@
       "anchorLabel": "WIEDERANPFIFF",
       "start": {
         "label": "PAUSE STARTEN",
-        "sub": "Ton aus · Einblender aus · Szenen des Drittels · Pausenvideo im Loop",
+        "sub": "Ton aus · Einblender aus · Szenen des Drittels · Pausenvideo im Liga-Rahmen, im Loop",
         "note": "Zurück mit dem Knopf ZURÜCK ZUM SPIEL",
         "minutes": 10,
         "calls": [
@@ -350,8 +350,16 @@
             "Input": "Pausenvideo_FBRiders_Loop_5min.mp4"
           },
           {
-            "clip": "Pausenvideo_FBRiders_Loop_5min.mp4",
-            "wait": false
+            "Function": "Restart",
+            "Input": "Pausenvideo_FBRiders_Loop_5min.mp4"
+          },
+          {
+            "Function": "Play",
+            "Input": "Pausenvideo_FBRiders_Loop_5min.mp4"
+          },
+          {
+            "Function": "CutDirect",
+            "Input": "Pause"
           },
           {
             "panel": "breakSound"

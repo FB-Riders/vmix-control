@@ -102,7 +102,7 @@ const configSchema = z.object({
   audio: z.object({
     sources: z.array(z.object({ id: z.string(), name: z.string(), short: z.string(), input: z.string(), role: z.enum(['commentary', 'atmo']).optional() })).min(1),
     music: z.object({ name: z.string(), input: z.string() }).optional(), // background music with its own play/pause control
-    breakVideo: z.string().optional(), // break video whose sound can be swapped for the music
+    breakVideo: z.string().optional(), // break video whose sound can be swapped for the music; it may run inside another input (a frame around it)
     breakSound: z.enum(['video', 'music']).default('video'), // what a break starts with: the video's own sound, or the video muted under the music list
     loudnessTarget: z.number().default(-16),
     loudnessTolerance: z.number().default(3),
