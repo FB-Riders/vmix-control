@@ -90,7 +90,7 @@ function Team({ side, team, gfx, manual }: { side: GfxSide; team: GfxTeam; gfx: 
       <div className="flex flex-col gap-2 rounded-md bg-card p-3">
         <div className="flex items-center justify-between gap-2">
           <Caption>STARTING 6</Caption>
-          <span className="text-xs font-light text-muted-foreground">{six && six.shown === 0 ? 'Team-Logo ist eingeblendet' : 'Goalie und erste Linie'}</span>
+          <span className="text-xs font-light text-muted-foreground">{six && six.shown === 0 ? 'Team-Logo ist eingeblendet' : 'aus der Spiel-Konfiguration'}</span>
         </div>
         <ol className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs">
           {team.startingSix.map((p, i) => (
