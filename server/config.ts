@@ -63,7 +63,7 @@ const configSchema = z.object({
       stopOnGoal: z.boolean().default(false), // true: a goal also stops the clock, as TCunihockey can
       // By hand, a penalty graphic also starts the penalty on the clock. Lengths not listed (10') stay off the clock.
       penaltyClock: z.record(z.string(), z.number().int().positive()).default({ "2'": 120, "2'+2'": 240, "5'": 300 }),
-      penaltyColor: z.string().default('#FFFFF000'), // box of a running penalty, as in the title
+      penaltyColor: z.string().default('#FFF000FF'), // box of a running penalty, as in the title: red, green, blue, opacity
       periods: z.array(z.string()).default(['1', '2', '3', 'O', 'P']),
     }).prefault({}),
     overlay: z.number().int().min(1).max(8).optional(),
