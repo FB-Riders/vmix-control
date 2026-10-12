@@ -35,24 +35,27 @@ export interface ClockFace {
   logos: Record<GfxSide, string>; // logo files on the vMix computer; empty = leave the title's logos
 }
 
+/** What is known without a running clock: teams and score. Time, period and penalties stay as the title has them. */
+export type ClockTeams = Pick<ClockFace, 'score' | 'names' | 'logos'>;
+
 /** The fields of the league's clock title for a clock face, one digit per field as the title wants it. */
-export function clockFields(face: ClockFace, penaltyColor: string): Record<string, string> {
+export function clockFields(face: ClockFace | ClockTeams, penaltyColor: string): Record<string, string> {
   const digits = (prefix: string, total: number) => {
     const m = String(Math.floor(total / 60)).padStart(2, '0');
     const s = String(total % 60).padStart(2, '0');
     return { [`${prefix}M10.Text`]: m[0], [`${prefix}M01.Text`]: m[1], [`${prefix}T.Text`]: ':', [`${prefix}S10.Text`]: s[0], [`${prefix}S01.Text`]: s[1] };
   };
+  const clock = 'seconds' in face ? face : null;
   const f: Record<string, string> = {
-    ...digits('TxtClockTime', face.seconds),
-    'TxtClockPeriod.Text': face.period,
+    ...(clock ? { ...digits('TxtClockTime', clock.seconds), 'TxtClockPeriod.Text': clock.period } : {}),
     'TxtHomeScore.Text': String(face.score.home),
     'TxtAwayScore.Text': String(face.score.away),
   };
   for (const side of SIDES) {
     if (face.names[side]) f[`Txt${cap(side)}Name.Text`] = face.names[side];
     if (face.logos[side]) f[`Img${cap(side)}Team.Source`] = face.logos[side];
-    for (let i = 0; i < SLOTS; i++) {
-      const left = face.penalties[side][i] ?? 0;
+    for (let i = 0; clock && i < SLOTS; i++) {
+      const left = clock.penalties[side][i] ?? 0;
       const prefix = `Txt${cap(side)}Pen${i + 1}`;
       // A free slot has no text and no box.
       for (const [field, value] of Object.entries(digits(prefix, left))) f[field] = left > 0 ? value : '';
@@ -79,7 +82,7 @@ export class ClockTitle {
   forget(): void { this.sent = {}; }
 
   /** A second that passes changes one or two fields, so this is a few calls at most. */
-  async write(face: ClockFace): Promise<void> {
+  async write(face: ClockFace | ClockTeams): Promise<void> {
     if (this.writing) return;
     this.writing = true;
     try {

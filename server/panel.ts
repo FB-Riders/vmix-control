@@ -408,9 +408,10 @@ export class Panel {
       b.names = names;
       b.logos = logos;
       b.push().catch(() => {});
-    } else if (this.bodet?.hasData) {
-      // Nothing is written before the Scorepad has delivered data, so the title keeps what it shows.
-      this.clockTitle.write(this.bodet.face(b.score, names, logos)).catch(() => {});
+    } else if (this.bodet) {
+      // Before the Scorepad has delivered data, time, period and penalties stay as the title has them. Teams and
+      // score are the panel's own and go in at once, or the clock would show the teams of the game before.
+      this.clockTitle.write(this.bodet.hasData ? this.bodet.face(b.score, names, logos) : { score: b.score, names, logos }).catch(() => {});
     }
   }
 

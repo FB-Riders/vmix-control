@@ -73,7 +73,8 @@ Scorepad over the network (`scoreboard.bodet`) and writes game time, period and 
 penalties per team into the clock title, with the team names and logos of the game config. The Matchuhr group
 shows whether the Scorepad is connected and what it last said; when the data stops, the box turns red and the
 title keeps the last state. A time-out on the console fades the team's time-out graphic in and takes it off again
-(`timeoutGraphic`). Nothing is written before the Scorepad has sent data.
+(`timeoutGraphic`). Before the Scorepad has sent data only team names, logos and the score are written; time,
+period and penalties stay as the title has them.
 
 Connecting the Scorepad (the protocol output exists only on the **main** keyboard):
 

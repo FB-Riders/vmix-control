@@ -58,3 +58,9 @@ test('clock title: after a failed write everything is sent again', async () => {
   await title.write(face());
   assert.equal(calls.length, Object.keys(clockFields(face(), '#FFF000')).length);
 });
+
+test('clock title: without a clock only teams and score are written', () => {
+  const { score, names, logos } = face();
+  const f = clockFields({ score, names, logos }, '#FFF000');
+  assert.deepEqual(Object.keys(f).sort(), ['ImgHomeTeam.Source', 'TxtAwayScore.Text', 'TxtHomeName.Text', 'TxtHomeScore.Text']);
+});
