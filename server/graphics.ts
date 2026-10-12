@@ -105,6 +105,8 @@ export class Graphics {
   ) {}
 
   get loaded(): boolean { return !!this.game; }
+  /** Kind of the graphic that is on, if any. */
+  get liveKind(): GfxRequest['kind'] | null { return this.live?.kind ?? null; }
 
   load(text: string): void {
     this.game = parseGameConfig(text);

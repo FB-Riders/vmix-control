@@ -8,7 +8,8 @@ import { PanelError } from './errors';
 import { Graphics, parseIni } from './graphics';
 import { emptyLog, type MatchLog, Monitor, type MonitorContext } from './monitor';
 import { ReplayBook, type ReplayBookData, type Scene } from './replays';
-import { ManualScoreboard, type ManualScoreboardData } from './scoreboard';
+import { BodetLink } from './bodet/link';
+import { ClockTitle, ManualScoreboard, type ManualScoreboardData } from './scoreboard';
 import { Shootout, type ShootoutFacts } from './shootout';
 import { parseSponsors, type SponsorSet, Sponsors } from './sponsors';
 import { type VmixClient, VmixError, type VmixInput, type VmixState } from './vmix';
@@ -105,6 +106,9 @@ export class Panel {
   private holdOverlays = false; // overlays stay off beyond the highlight scenes: whole highlight video, whole break
   private readonly sponsors: Sponsors | null;
   private readonly board: ManualScoreboard | null; // match clock by hand, in place of the scoreboard link
+  private readonly clockTitle: ClockTitle | null; // the clock title, whoever fills it
+  private readonly bodet: BodetLink | null; // link to the hall's Bodet Scorepad
+  private timeoutShown = false; // the time-out graphic is on because the console runs a time-out
   private readonly shootout: Shootout | null; // penalty shoot-out display in place of the match clock
   private sponsorSet: SponsorSet | null = null; // as imported, to have it again after a restart
   private schedule: ScheduleStore;
@@ -134,7 +138,13 @@ export class Panel {
     this.periodManual = sameDay ? saved.periodManual ?? null : null;
     this.gfx = cfg.graphics ? new Graphics(cfg.graphics, (params) => vmix.call(params), (input) => this.ref(input)) : null;
     const sb = cfg.scoreboard;
-    this.board = sb ? new ManualScoreboard({ input: sb.input, ...sb.manual }, (params) => vmix.call(params), (input) => this.ref(input), () => this.persist(), sameDay ? saved.scoreboard : undefined) : null;
+    this.clockTitle = sb ? new ClockTitle(sb.input, sb.manual.penaltyColor, (params) => vmix.call(params), (input) => this.ref(input)) : null;
+    this.board = sb && this.clockTitle ? new ManualScoreboard(sb.manual, this.clockTitle, () => this.persist(), sameDay ? saved.scoreboard : undefined) : null;
+    const bd = sb?.bodet;
+    const bodetPort = Number(process.env.BODET_PORT) || bd?.port || 4001;
+    this.bodet = bd?.enabled && (bd.mode === 'listen' || bd.host)
+      ? new BodetLink({ ...bd, host: bd.host || '0.0.0.0', port: bodetPort }, (message) => this.log('action', `Bodet: ${message}`), () => this.broadcast())
+      : null;
     const so = cfg.graphics?.shootout;
     this.shootout = so ? new Shootout({ ...so, overlay: cfg.scoreboard?.overlay ?? 1 }, (params) => vmix.call(params), (input) => this.ref(input)) : null;
     this.sponsorSet = saved.sponsors ?? null;
@@ -280,6 +290,7 @@ export class Panel {
       this.runDueSteps(now);
       this.directSound(now);
       this.trackPeriods();
+      this.followTimeout();
       if (this.gfx && this.cfg.graphics) this.gfx.sync(this.vm.inputs.find((i) => i.number === this.vm?.overlays[this.cfg.graphics?.overlay ?? 0])?.title);
       this.gfx?.tick(now);
     }
@@ -350,11 +361,12 @@ export class Panel {
     const sb = this.cfg.scoreboard;
     const inp = sb && this.findInput(sb.input);
     // By hand the panel knows score and period itself; reading them back from the title would only add a way to fail.
-    const b = this.board?.manual ? this.board : null;
+    // The same goes for what the Scorepad says.
+    const b = this.clockSource();
     if (!sb || (!inp && !b)) return null;
     const f = (name: string) => (name ? inp?.fields[name]?.trim() ?? '' : '');
     const names = [f(sb.homeName), f(sb.awayName)];
-    const period = b ? b.period : f(sb.period);
+    const period = b?.period || f(sb.period);
     const clock = [sb.clock].flat().map(f).join('');
     return { home: b ? String(b.score.home) : f(sb.home), away: b ? String(b.score.away) : f(sb.away), period: period && sb.periodFormat.replace('{}', period), clock, teams: names.every(Boolean) ? names.join(' – ') : '' };
   }
@@ -372,13 +384,46 @@ export class Panel {
     };
   }
 
+  /**
+   * Who the panel knows score and period from without reading the title. The score is always the panel's own count:
+   * a goal graphic counts it, so the clock shows it at once. The period is the operator's by hand, else the Scorepad's.
+   */
+  private clockSource(): { period: string; score: { home: number; away: number } } | null {
+    const b = this.board;
+    if (!b || !this.countsGoals()) return null;
+    return { score: b.score, period: b.manual ? b.period : this.bodet?.hasData ? this.bodet.period : '' };
+  }
+
+  /** The panel counts the goals itself, unless another program fills the clock title. */
+  private countsGoals(): boolean { return !!this.board && (this.board.manual || !!this.bodet); }
+
   private pushScoreboard(): void {
     const b = this.board;
-    if (!b?.manual) return;
+    if (!b || !this.clockTitle) return;
     const teams = this.gfx?.teams();
-    b.names = { home: teams?.home.short ?? '', away: teams?.away.short ?? '' };
-    b.logos = { home: teams?.home.logo ?? '', away: teams?.away.logo ?? '' };
-    b.push().catch(() => {});
+    const names = { home: teams?.home.short ?? '', away: teams?.away.short ?? '' };
+    const logos = { home: teams?.home.logo ?? '', away: teams?.away.logo ?? '' };
+    if (b.manual) {
+      b.names = names;
+      b.logos = logos;
+      b.push().catch(() => {});
+    } else if (this.bodet?.hasData) {
+      // Nothing is written before the Scorepad has delivered data, so the title keeps what it shows.
+      this.clockTitle.write(this.bodet.face(b.score, names, logos)).catch(() => {});
+    }
+  }
+
+  /** A time-out on the console puts the team's time-out graphic on, and takes it off again when it is over. */
+  private followTimeout(): void {
+    if (!this.bodet || !this.gfx?.loaded || !this.cfg.scoreboard?.bodet?.timeoutGraphic) return;
+    const team = !this.board?.manual && this.bodet.live && !this.playing && !this.holdOverlays ? this.bodet.timeout : null;
+    if (team && !this.timeoutShown) {
+      this.timeoutShown = true;
+      this.showGraphic({ kind: 'timeout', team }).catch(() => {});
+    } else if (!team && this.timeoutShown) {
+      this.timeoutShown = false;
+      if (this.gfx.liveKind === 'timeout') this.gfx.hide().catch(() => {}); // not if the operator has put something else on meanwhile
+    }
   }
 
   private needBoard(): ManualScoreboard {
@@ -432,7 +477,7 @@ export class Panel {
   /** Period shown on the scoreboard as an index into the configured periods; anything that is not 1, 2, 3 ... counts as the last (overtime). */
   private scoreboardPeriod(): number | null {
     const sb = this.cfg.scoreboard;
-    const raw = this.board?.manual ? this.board.period : sb?.period ? this.findInput(sb.input)?.fields[sb.period]?.trim() : '';
+    const raw = this.clockSource()?.period || (sb?.period ? this.findInput(sb.input)?.fields[sb.period]?.trim() : '');
     if (!raw) return null;
     const last = this.cfg.replay.periods.length - 1;
     return /^\d+$/.test(raw) ? Math.min(Math.max(Number(raw) - 1, 0), last) : last;
@@ -700,7 +745,7 @@ export class Panel {
         : null,
       music: this.musicState(),
       gfx,
-      scoreboard: this.board ? { ...this.board.view(), onAir: this.clockOnAir() } : null,
+      scoreboard: this.board ? { ...this.board.view(), onAir: this.clockOnAir(), bodet: this.bodet?.view() ?? null, counts: this.countsGoals() } : null,
       shootout: this.shootout?.view() ?? null,
       breakSound: cfg.audio?.music && cfg.audio.breakVideo ? { music: this.breakMusic } : null,
       sponsor,
@@ -820,10 +865,10 @@ export class Panel {
   private async showGraphic(req: GfxRequest | 'hide'): Promise<void> {
     if (!this.gfx) throw new PanelError('In config.json sind keine Einblender (graphics) hinterlegt');
     if (req === 'hide') { await this.gfx.hide(); return; }
-    // Clock by hand: one press does it all. A goal counts, a penalty starts on the clock.
-    const b = this.board?.manual ? this.board : null;
+    // One press does it all: a goal counts, and by hand a penalty starts on the clock (with the scoreboard link the console runs the penalties).
+    const b = this.board && this.countsGoals() ? this.board : null;
     if (b && req.team && req.kind === 'goal') b.goal(req.team, 1);
-    if (b && req.team && req.kind === 'penalty' && req.value) b.addPenalty(req.team, req.value);
+    if (b?.manual && req.team && req.kind === 'penalty' && req.value) b.addPenalty(req.team, req.value);
     if (b) this.pushScoreboard();
     const s = b ? { home: String(b.score.home), away: String(b.score.away) } : this.scoreText();
     await this.gfx.show(req, s ? `${s.home}:${s.away}` : '', this.periodResults());
@@ -1412,10 +1457,12 @@ export class Panel {
       const fields = (sb && this.findInput(sb.input)?.fields) || {};
       const time = [sb?.clock ?? []].flat().map((f) => fields[f] ?? '').join('').match(/^(\d{1,2}):(\d{2})$/);
       const score = this.scoreNumbers();
+      const bd = this.bodet?.hasData ? this.bodet : null; // the Scorepad's last word is more exact than the title, and has the penalties
       this.needBoard().setMode(manual, {
-        seconds: time ? Number(time[1]) * 60 + Number(time[2]) : undefined,
-        period: sb?.period ? fields[sb.period]?.trim() : undefined,
-        home: score?.home, away: score?.away,
+        seconds: bd ? bd.seconds : time ? Number(time[1]) * 60 + Number(time[2]) : undefined,
+        period: bd ? bd.period : sb?.period ? fields[sb.period]?.trim() : undefined,
+        home: this.bodet ? undefined : score?.home, away: this.bodet ? undefined : score?.away, // with the link the count is already the panel's
+        penalties: bd ? { home: bd.penalties('home'), away: bd.penalties('away') } : undefined,
       });
     },
     'scoreboard/show': async ({ on }) => {
@@ -1430,7 +1477,7 @@ export class Panel {
     'scoreboard/goal': async ({ team, delta }) => { this.needBoard().goal(team, delta); },
     'scoreboard/penalty': async ({ team, slot, seconds }) => { this.needBoard().penalty(team, slot, seconds); },
     'scoreboard/addPenalty': async ({ team, label }) => { this.needBoard().startPenalty(team, label); },
-    'scoreboard/reset': async () => { this.needBoard().reset(); },
+    'scoreboard/reset': async ({ what }) => { this.needBoard().reset(what); },
 
     'shootout/show': async ({ on }) => {
       const so = this.needShootout();

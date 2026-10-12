@@ -22,17 +22,12 @@ function useClock(sb: ManualScoreboardState) {
   return { seconds: Math.floor(elapsed / 1000), penalties: { home: sb.penalties.home.map(left), away: sb.penalties.away.map(left) } };
 }
 
-/** Clock by hand: score and the two penalty slots of one team. */
+/** Clock by hand: the two penalty slots of one team. */
 export function ScoreboardTeam({ side, name, scoreboard: sb, add }: { side: GfxSide; name: string; scoreboard: ManualScoreboardState; add?: string[] }) {
   const penalties = useClock(sb).penalties[side];
   return (
     <div className="flex flex-col gap-2 rounded-md bg-card p-3">
-      <div className="flex items-center gap-2">
-        <span className="min-w-0 grow truncate text-sm font-semibold">{name}</span>
-        <Button variant="outline" className={cn('h-11 w-11 p-0 text-base', plain)} disabled={sb.score[side] === 0} aria-label={`${name}: ein Tor abziehen`} onClick={() => act('scoreboard/goal', { team: side, delta: -1 })}>−1</Button>
-        <span className="w-9 text-center text-2xl font-black tabular-nums" aria-label={`${name}: ${sb.score[side]} Tore`}>{sb.score[side]}</span>
-        <Button variant="outline" className={cn('h-11 w-14 p-0 text-base', soft, 'bg-background')} aria-label={`${name}: ein Tor dazu`} onClick={() => act('scoreboard/goal', { team: side, delta: 1 })}>+1</Button>
-      </div>
+      <span className="truncate text-sm font-semibold">Strafen {name}</span>
       {/* Penalties are started with the penalty buttons below; here they only run and can be taken off. */}
       <div className="grid grid-cols-2 gap-1.5">
         {penalties.map((seconds, i) => (
@@ -78,14 +73,74 @@ export function ScoreboardMode({ scoreboard: sb }: { scoreboard: ManualScoreboar
   };
   return (
     <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="Quelle der Matchuhr">
-      {option(false, 'ANZEIGETAFEL', 'Bodet füllt die Matchuhr')}
-      {option(true, 'VON HAND', 'Regie führt Zeit und Spielstand')}
+      {option(false, 'ANZEIGETAFEL', sb.bodet ? 'Bodet füllt die Matchuhr' : 'Ein anderes Programm füllt sie')}
+      {option(true, 'VON HAND', 'Regie führt Zeit und Strafen')}
     </div>
   );
 }
 
+/** Clock from the hall's scoreboard: whether the Scorepad delivers, and what it last said. */
+export function BodetStatus({ scoreboard: sb, teams }: { scoreboard: ManualScoreboardState; teams: { home: string; away: string } }) {
+  const b = sb.bodet;
+  if (!b) return null;
+  const lost = !!b.error || b.signal === 'stale';
+  const status = b.error ? `Port ${b.port} lässt sich nicht öffnen (${b.error}). Läuft noch ein anderes Programm für die Anzeigetafel?`
+    : b.signal === 'live' ? 'Scorepad verbunden, Daten kommen.'
+    : b.signal === 'stale' ? 'Keine Daten mehr vom Scorepad. Die Matchuhr steht auf dem letzten Stand; bei Bedarf auf «Von Hand» umschalten.'
+    : b.connected ? 'Scorepad verbunden, noch keine Daten. Am Scorepad das Spiel starten.'
+    : `Scorepad nicht verbunden. Die Regie wartet auf Port ${b.port}.`;
+  const penalties = (side: GfxSide) => b.penalties[side].filter((x) => x > 0).map(clock).join(' · ');
+  return (
+    <div className={cn('flex flex-col gap-2 rounded-md border-2 p-3', lost ? 'border-primary' : 'border-input')} role="status">
+      <p className={cn('text-[13px]', lost ? 'font-black text-primary' : 'font-medium')}>{status}</p>
+      {b.signal !== 'none' && (
+        <div className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1">
+          <span className="row-span-2 text-3xl leading-none font-black tabular-nums" aria-label={`Spielzeit ${clock(b.seconds)}`}>{clock(b.seconds)}</span>
+          <span className="text-[11px] font-black tracking-wide">{b.signal === 'stale' ? 'LETZTER STAND' : b.running ? 'LÄUFT' : 'STEHT'}{b.period && ` · ${PERIOD_NAMES[b.period]?.toUpperCase() ?? `${b.period}. DRITTEL`}`}{b.timeout && ` · TIME-OUT ${teams[b.timeout]}`}</span>
+          {(['home', 'away'] as const).map((side) => penalties(side) && (
+            <span key={side} className="col-span-2 text-[13px] tabular-nums">Strafen {teams[side]}: {penalties(side)}</span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The score is counted in the panel, whoever gives the time: a goal graphic counts, here it is corrected. */
+export function ScoreCount({ scoreboard: sb, teams }: { scoreboard: ManualScoreboardState; teams: { home: string; away: string } }) {
+  const [resetting, setResetting] = useState(false);
+  const b = sb.bodet;
+  const differs = !sb.manual && !!b && b.signal !== 'none' && (b.score.home !== sb.score.home || b.score.away !== sb.score.away);
+  return (
+    <>
+      <p className="text-xs font-light text-muted-foreground">Wird hier gezählt, nicht von der Anzeigetafel übernommen: TOR bei der Spielerin zählt +1 und steht sofort auf der Matchuhr.</p>
+      {(['home', 'away'] as const).map((side) => (
+        <div key={side} className="flex items-center gap-2 rounded-md bg-card p-3">
+          <span className="min-w-0 grow truncate text-sm font-semibold">{teams[side]}</span>
+          <Button variant="outline" className={cn('h-11 w-11 p-0 text-base', plain)} disabled={sb.score[side] === 0} aria-label={`${teams[side]}: ein Tor abziehen`} onClick={() => act('scoreboard/goal', { team: side, delta: -1 })}>−1</Button>
+          <span className="w-9 text-center text-2xl font-black tabular-nums" aria-label={`${teams[side]}: ${sb.score[side]} Tore`}>{sb.score[side]}</span>
+          <Button variant="outline" className={cn('h-11 w-14 p-0 text-base', soft, 'bg-background')} aria-label={`${teams[side]}: ein Tor dazu`} onClick={() => act('scoreboard/goal', { team: side, delta: 1 })}>+1</Button>
+        </div>
+      ))}
+      {differs && b && <p className="text-[13px] font-black text-primary" role="status">Die Anzeigetafel zeigt {b.score.home}:{b.score.away}.</p>}
+      <Button
+        variant="outline"
+        className={cn('h-10 px-1 text-xs', resetting ? 'border-2 border-primary bg-primary font-black' : plain)}
+        disabled={!resetting && sb.score.home === 0 && sb.score.away === 0}
+        onClick={() => {
+          if (!resetting) { setResetting(true); setTimeout(() => setResetting(false), 3000); return; }
+          setResetting(false);
+          void act('scoreboard/reset', { what: 'score' });
+        }}
+      >
+        {resetting ? 'WIRKLICH AUF 0:0?' : 'SPIELSTAND AUF 0:0'}
+      </Button>
+    </>
+  );
+}
+
 /**
- * Clock by hand: game time, period, score and penalties of both teams, reset. `add` puts penalty buttons under the
+ * Clock by hand: game time, period and penalties of both teams, reset. The score has its own block (ScoreCount). `add` puts penalty buttons under the
  * teams, for when there are no team columns with penalty buttons (no game config loaded).
  */
 export function ScoreboardPanel({ scoreboard: sb, teams, add }: { scoreboard: ManualScoreboardState; teams: { home: string; away: string }; add?: string[] }) {
@@ -148,10 +203,10 @@ export function ScoreboardPanel({ scoreboard: sb, teams, add }: { scoreboard: Ma
         onClick={() => {
           if (!resetting) { setResetting(true); setTimeout(() => setResetting(false), 3000); return; }
           setResetting(false);
-          void act('scoreboard/reset');
+          void act('scoreboard/reset', { what: 'clock' });
         }}
       >
-        {resetting ? 'WIRKLICH ALLES AUF 0?' : 'SPIEL ZURÜCKSETZEN'}
+        {resetting ? 'ZEIT, ABSCHNITT UND STRAFEN AUF 0?' : 'UHR ZURÜCKSETZEN'}
       </Button>
     </>
   );

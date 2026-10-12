@@ -65,7 +65,7 @@ export const actionSchemas = {
   'scoreboard/penalty': z.object({ team: z.enum(['home', 'away']), slot: z.number().int().min(1).max(2), seconds: z.number().int().min(0).max(1200) }),
   // A penalty of the given kind (as on the penalty buttons, e.g. "2'") on the clock, without a graphic.
   'scoreboard/addPenalty': z.object({ team: z.enum(['home', 'away']), label: z.string() }),
-  'scoreboard/reset': z.object({}),
+  'scoreboard/reset': z.object({ what: z.enum(['score', 'clock']) }), // the goal count, or time, period and penalties of the clock by hand
   // Penalty shoot-out display in place of the match clock.
   'shootout/show': z.object({ on: z.boolean() }),
   'shootout/shot': z.object({ team: z.enum(['home', 'away']), result: z.enum(['goal', 'miss']) }),

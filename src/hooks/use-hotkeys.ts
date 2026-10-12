@@ -71,14 +71,14 @@ export function useGfxHotkeys(state: PanelState | null, enabled: boolean) {
       if (key === 'Escape') { if (gfx.live) void act('gfx/hide'); else return; }
       else if (key === 'N' && gfx.live?.six && gfx.live.six.shown < gfx.live.six.total) void act('gfx/next');
       else if (key === 'M' && sb && !state.shootout?.live) void act('scoreboard/show', { on: !sb.onAir });
+      else if (sb?.counts && (key === 'H' || key === 'G')) {
+        const team = key === 'H' ? 'home' : 'away';
+        if (e.shiftKey && sb.score[team] === 0) return;
+        void act('scoreboard/goal', { team, delta: e.shiftKey ? -1 : 1 });
+      }
       else if (!manual) return;
       else if (key === ' ') void act('scoreboard/run', { on: manual.runningSince === null });
       else if (arrow) void act('scoreboard/adjust', { seconds: arrow * (e.shiftKey ? 10 : 1) });
-      else if (key === 'H' || key === 'G') {
-        const team = key === 'H' ? 'home' : 'away';
-        if (e.shiftKey && manual.score[team] === 0) return;
-        void act('scoreboard/goal', { team, delta: e.shiftKey ? -1 : 1 });
-      }
       else if (penalty) void act('scoreboard/addPenalty', { team: e.shiftKey ? 'away' : 'home', label: penalty });
       else return;
       e.preventDefault();

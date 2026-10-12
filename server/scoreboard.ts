@@ -4,11 +4,9 @@ import { PanelError } from './errors';
 import type { VmixParams } from './vmix';
 
 export interface ManualScoreboardConfig {
-  input: string; // the match clock title
   periodMinutes: number; // the clock stops by itself here
   stopOnGoal: boolean; // +1 also stops the clock
   penaltyClock: Record<string, number>; // penalty graphic (e.g. "2'") -> seconds it puts on the clock; others stay off it
-  penaltyColor: string; // fill of a penalty slot that is in use; an unused slot is made transparent
   periods: string[]; // what the period field shows, in order
 }
 
@@ -24,7 +22,85 @@ export interface ManualScoreboardData {
 const SLOTS = 2; // penalty slots per team in the title
 const SIDES: GfxSide[] = ['home', 'away'];
 const HIDDEN = '#00000000';
+const RESYNC_MS = 30_000;
 const cap = (s: GfxSide) => (s === 'home' ? 'Home' : 'Away');
+
+/** What the clock title shows: the same for the clock by hand and the one from the hall's scoreboard. */
+export interface ClockFace {
+  seconds: number; // game time
+  period: string;
+  score: Record<GfxSide, number>;
+  penalties: Record<GfxSide, number[]>; // seconds left per slot of the title, 0 = free
+  names: Record<GfxSide, string>; // short team names; empty = leave the title's names
+  logos: Record<GfxSide, string>; // logo files on the vMix computer; empty = leave the title's logos
+}
+
+/** The fields of the league's clock title for a clock face, one digit per field as the title wants it. */
+export function clockFields(face: ClockFace, penaltyColor: string): Record<string, string> {
+  const digits = (prefix: string, total: number) => {
+    const m = String(Math.floor(total / 60)).padStart(2, '0');
+    const s = String(total % 60).padStart(2, '0');
+    return { [`${prefix}M10.Text`]: m[0], [`${prefix}M01.Text`]: m[1], [`${prefix}T.Text`]: ':', [`${prefix}S10.Text`]: s[0], [`${prefix}S01.Text`]: s[1] };
+  };
+  const f: Record<string, string> = {
+    ...digits('TxtClockTime', face.seconds),
+    'TxtClockPeriod.Text': face.period,
+    'TxtHomeScore.Text': String(face.score.home),
+    'TxtAwayScore.Text': String(face.score.away),
+  };
+  for (const side of SIDES) {
+    if (face.names[side]) f[`Txt${cap(side)}Name.Text`] = face.names[side];
+    if (face.logos[side]) f[`Img${cap(side)}Team.Source`] = face.logos[side];
+    for (let i = 0; i < SLOTS; i++) {
+      const left = face.penalties[side][i] ?? 0;
+      const prefix = `Txt${cap(side)}Pen${i + 1}`;
+      // A free slot has no text and no box.
+      for (const [field, value] of Object.entries(digits(prefix, left))) f[field] = left > 0 ? value : '';
+      f[`Rect${cap(side)}Pen${i + 1}.Fill.Color`] = left > 0 ? penaltyColor : HIDDEN;
+    }
+  }
+  return f;
+}
+
+/** Writes a clock face into the title: only the fields that differ from what the title holds. */
+export class ClockTitle {
+  private sent: Record<string, string> = {};
+  private sentSince = 0;
+  private writing = false;
+
+  constructor(
+    private readonly input: string,
+    private readonly penaltyColor: string,
+    private readonly call: (params: VmixParams) => Promise<void>,
+    private readonly ref: (input: string) => string | number,
+  ) {}
+
+  /** The title may hold anything by now: the next write sends every field again. */
+  forget(): void { this.sent = {}; }
+
+  /** A second that passes changes one or two fields, so this is a few calls at most. */
+  async write(face: ClockFace): Promise<void> {
+    if (this.writing) return;
+    this.writing = true;
+    try {
+      // Every now and then everything is written again, so a reloaded preset catches up.
+      const now = Date.now();
+      if (now - this.sentSince > RESYNC_MS) { this.sent = {}; this.sentSince = now; }
+      const input = this.ref(this.input);
+      for (const [field, value] of Object.entries(clockFields(face, this.penaltyColor))) {
+        if (this.sent[field] === value) continue;
+        await this.call({ Function: field.endsWith('.Color') ? 'SetColor' : field.endsWith('.Source') ? 'SetImage' : 'SetText', Input: input, SelectedName: field, Value: value });
+        this.sent[field] = value;
+      }
+    } catch (e) {
+      this.sent = {}; // vMix may have been restarted or the preset reloaded: start over
+      throw e;
+    } finally {
+      this.writing = false;
+    }
+  }
+}
+
 const fresh = (): ManualScoreboardData => ({ manual: false, elapsedMs: 0, period: '1', score: { home: 0, away: 0 }, penalties: { home: [0, 0], away: [0, 0] } });
 
 /**
@@ -38,15 +114,12 @@ const fresh = (): ManualScoreboardData => ({ manual: false, elapsedMs: 0, period
 export class ManualScoreboard {
   private d: ManualScoreboardData;
   private startedAt: number | null = null; // clock running since; elapsedMs and penalties are as of then
-  private sent: Record<string, string> = {}; // what the title holds, field -> value
-  private pushing = false;
   names: Record<GfxSide, string> = { home: '', away: '' }; // short team names; empty = leave the title's names
   logos: Record<GfxSide, string> = { home: '', away: '' }; // logo files on the vMix computer; empty = leave the title's logos
 
   constructor(
     private readonly cfg: ManualScoreboardConfig,
-    private readonly call: (params: VmixParams) => Promise<void>,
-    private readonly ref: (input: string) => string | number,
+    private readonly title: ClockTitle,
     private readonly changed: () => void, // something worth saving happened
     data?: ManualScoreboardData,
   ) {
@@ -90,16 +163,17 @@ export class ManualScoreboard {
    * Hands the clock title to the panel, or back to the scoreboard link. Taking over, the panel carries on from what
    * the title shows at that moment (as far as it can be read), with the clock standing still.
    */
-  setMode(manual: boolean, shown?: { seconds?: number; period?: string; home?: number; away?: number }): void {
+  setMode(manual: boolean, shown?: { seconds?: number; period?: string; home?: number; away?: number; penalties?: Record<GfxSide, number[]> }): void {
     this.settle();
     this.startedAt = null;
     if (manual && !this.d.manual && shown) {
       if (shown.seconds !== undefined) this.d.elapsedMs = Math.min(this.limit, shown.seconds * 1000);
       if (shown.period && this.cfg.periods.includes(shown.period)) this.d.period = shown.period;
       if (shown.home !== undefined && shown.away !== undefined) this.d.score = { home: shown.home, away: shown.away };
+      if (shown.penalties) for (const side of SIDES) this.d.penalties[side] = Array.from({ length: SLOTS }, (_, i) => (shown.penalties?.[side][i] ?? 0) * 1000);
     }
     this.d.manual = manual;
-    this.sent = {}; // the title may hold anything by now: write everything again
+    this.title.forget();
     this.changed();
   }
 
@@ -139,8 +213,8 @@ export class ManualScoreboard {
     this.changed();
   }
 
+  /** The score is the panel's own count also while the hall's scoreboard gives the time. */
   goal(side: GfxSide, delta: number): void {
-    this.need();
     if (delta > 0 && this.cfg.stopOnGoal && this.running) { this.settle(); this.startedAt = null; }
     this.d.score[side] = Math.max(0, this.d.score[side] + delta);
     this.changed();
@@ -176,67 +250,39 @@ export class ManualScoreboard {
   get score(): Record<GfxSide, number> { return this.d.score; }
   get period(): string { return this.d.period; }
 
-  /** Score, time, period and penalties back to the start of a game. */
-  reset(): void {
-    this.startedAt = null;
-    this.d = { ...fresh(), manual: this.d.manual };
+  /** Back to the start of a game: the goal count, or time, period and penalties of the clock by hand. */
+  reset(what: 'score' | 'clock'): void {
+    if (what === 'score') {
+      this.d.score = { home: 0, away: 0 };
+    } else {
+      this.startedAt = null;
+      this.d = { ...fresh(), manual: this.d.manual, score: this.d.score };
+    }
     this.changed();
   }
 
   // ---------- vMix ----------
 
-  /** The title's fields as they should be right now. */
-  private fields(now: number): Record<string, string> {
-    const digits = (prefix: string, ms: number, up: boolean) => {
-      // Game time shows the second that has begun, a penalty the second that is still running.
-      const total = up ? Math.floor(ms / 1000) : Math.ceil(ms / 1000);
-      const m = String(Math.floor(total / 60)).padStart(2, '0');
-      const s = String(total % 60).padStart(2, '0');
-      return { [`${prefix}M10.Text`]: m[0], [`${prefix}M01.Text`]: m[1], [`${prefix}T.Text`]: ':', [`${prefix}S10.Text`]: s[0], [`${prefix}S01.Text`]: s[1] };
+  /** What the title should show right now. */
+  private face(now: number): ClockFace {
+    // Game time shows the second that has begun, a penalty the second that is still running.
+    const left = (side: GfxSide) => this.remaining(side, now).map((ms) => Math.ceil(ms / 1000));
+    return {
+      seconds: Math.floor(this.elapsed(now) / 1000), period: this.d.period, score: this.d.score,
+      penalties: { home: left('home'), away: left('away') }, names: this.names, logos: this.logos,
     };
-    const f: Record<string, string> = {
-      ...digits('TxtClockTime', this.elapsed(now), true),
-      'TxtClockPeriod.Text': this.d.period,
-      'TxtHomeScore.Text': String(this.d.score.home),
-      'TxtAwayScore.Text': String(this.d.score.away),
-    };
-    for (const side of SIDES) {
-      if (this.names[side]) f[`Txt${cap(side)}Name.Text`] = this.names[side];
-      if (this.logos[side]) f[`Img${cap(side)}Team.Source`] = this.logos[side];
-      this.remaining(side, now).forEach((ms, i) => {
-        const prefix = `Txt${cap(side)}Pen${i + 1}`;
-        const shown = digits(prefix, ms, false);
-        // A free slot has no text and no box.
-        for (const [field, value] of Object.entries(shown)) f[field] = ms > 0 ? value : '';
-        f[`Rect${cap(side)}Pen${i + 1}.Fill.Color`] = ms > 0 ? this.cfg.penaltyColor : HIDDEN;
-      });
-    }
-    return f;
   }
 
-  /**
-   * Called several times a second: stops the clock at the end of the period and writes into the title whatever
-   * differs from what it holds. A second that passes changes one or two fields, so this is a few calls at most.
-   */
+  /** Called several times a second: stops the clock at the end of the period and brings the title up to date. */
   async push(now = Date.now()): Promise<void> {
-    if (!this.d.manual || this.pushing) return;
+    if (!this.d.manual) return;
     if (this.running && this.elapsed(now) >= this.limit) { this.settle(); this.startedAt = null; this.changed(); }
-    this.pushing = true;
-    try {
-      const input = this.ref(this.cfg.input);
-      for (const [field, value] of Object.entries(this.fields(now))) {
-        if (this.sent[field] === value) continue;
-        await this.call({ Function: field.endsWith('.Color') ? 'SetColor' : field.endsWith('.Source') ? 'SetImage' : 'SetText', Input: input, SelectedName: field, Value: value });
-        this.sent[field] = value;
-      }
-    } finally {
-      this.pushing = false;
-    }
+    await this.title.write(this.face(now));
   }
 
   // ---------- state for the screens ----------
 
-  view(): Omit<ManualScoreboardState, 'onAir'> {
+  view(): Omit<ManualScoreboardState, 'onAir' | 'bodet' | 'counts'> {
     return {
       manual: this.d.manual,
       // Time and penalties as of `runningSince`; the screens count on from there by themselves.

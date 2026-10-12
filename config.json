@@ -39,6 +39,12 @@
     ],
     "homeName": "TxtHomeName.Text",
     "awayName": "TxtAwayName.Text",
+    "bodet": {
+      "enabled": true,
+      "mode": "listen",
+      "port": 4001,
+      "timeoutGraphic": true
+    },
     "overlay": 1
   },
   "replay": {
@@ -140,13 +146,13 @@
       "input": "General Music*"
     },
     "breakVideo": "Pausenvideo_FBRiders_Loop_5min.mp4",
+    "breakSound": "video",
     "loudnessTarget": -16,
     "loudnessTolerance": 3,
     "loudnessOffset": 0,
     "commentaryOverAtmo": 10
   },
   "sponsor": {
-    "breakSound": "video",
     "inputs": [
       "LUPL-SU_sponsor.gtzip"
     ],

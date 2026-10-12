@@ -162,9 +162,26 @@ export interface GfxTeam {
   startingSix: GfxPlayer[]; // first goalie and first line
 }
 
+/** The link to the hall's Bodet Scorepad and what the console last said. */
+export interface BodetState {
+  connected: boolean; // the Scorepad (or its interface) is connected
+  signal: 'none' | 'live' | 'stale'; // none: nothing received yet; stale: the data is old
+  peer: string; // who is connected
+  port: number;
+  error: string; // the port could not be opened
+  running: boolean;
+  seconds: number; // game time
+  period: string;
+  score: { home: number; away: number }; // what the console shows; the title gets the panel's own count
+  penalties: { home: number[]; away: number[] }; // seconds left per slot, 0 = free
+  timeout: 'home' | 'away' | null; // team whose time-out is running
+}
+
 /** The match clock driven by hand instead of by the hall's scoreboard. */
 export interface ManualScoreboardState {
   manual: boolean; // false: the scoreboard link fills the clock title
+  bodet: BodetState | null; // null: the panel has no link of its own, another program fills the title
+  counts: boolean; // the panel counts the goals itself (by hand, or with its own scoreboard link); false: the score is whatever the title shows
   onAir: boolean; // the clock is on its overlay channel
   runningSince: number | null; // server time the clock was started; null = it stands still
   elapsedMs: number; // game time as of runningSince (or now, if it stands still)

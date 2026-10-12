@@ -47,7 +47,7 @@ dropped frames or the Hub's status, so those are not shown.
 
 ## On-screen graphics (Einblender)
 
-The EINBLENDER screen replaces TCunihockey for everything except the match clock, which comes from the scoreboard.
+The EINBLENDER screen replaces TCunihockey. The match clock comes from the hall's Bodet scoreboard, or is run by hand.
 It is grouped by vMix overlay channel: MATCHUHR (with the penalty shoot-out display, which takes its place),
 EINBLENDER, SPONSOREN and LIGA-LOGOS. Each group's heading says what is on its channel right now and has the
 button to put it on or take it off.
@@ -68,12 +68,37 @@ overlay channel, one at a time:
 | Penalty shoot-out | `graphics.shootout.input` | not from the game config: five circles per team, coloured per attempt (`colors.goal` / `miss` / `open`); goes on the match clock's overlay channel in its place, names and score copied from the clock title |
 | Starting six | `startingSix` | the six of `Starting6` in that order (without it: first goalie and first line); fades in with the team logo, then the stepper brings on one player at a time (the title's animation pages `Page1`–`Page6`) |
 
-**Match clock by hand.** Normally the hall's scoreboard fills the clock title. If that link fails, the switch
-"Matchuhr von Hand" on the Einblender screen hands the title to the panel: it carries on from the time, period and
-score the title shows, and from then on writes game time (counts up, stops at `scoreboard.manual.periodMinutes`),
-period, score and two penalties per team (they run with the game time and vanish at 00:00). `+1` leaves the clock running;
-set `stopOnGoal` to `true` to have a goal stop it. Switched off, the panel writes nothing into the title any more. Do not run both at once: if the
-scoreboard link still writes, the two overwrite each other.
+**Match clock from the scoreboard (ANZEIGETAFEL).** The panel receives the protocol output of the hall's Bodet
+Scorepad over the network (`scoreboard.bodet`) and writes game time, period and the first two running
+penalties per team into the clock title, with the team names and logos of the game config. The Matchuhr group
+shows whether the Scorepad is connected and what it last said; when the data stops, the box turns red and the
+title keeps the last state. A time-out on the console fades the team's time-out graphic in and takes it off again
+(`timeoutGraphic`). Nothing is written before the Scorepad has sent data.
+
+Connecting the Scorepad (the protocol output exists only on the **main** keyboard):
+
+1. Give the vMix computer a fixed IP in the Scorepad's network.
+2. On the Scorepad: *Technician menu* (code `4934`) → *Communication protocols* → *+ Create*. Choose the protocol
+   type, enter the vMix computer's IP and port `4001`, run the test (green = OK) and save.
+3. Start the panel, then launch the sport and start the match on the Scorepad. Frames are only sent while a match
+   is open. Allow Node through the Windows firewall for port 4001 when asked.
+
+With the RJ45/RS232 interface (Moxa NPort in TCP server mode) the panel dials instead: `"mode": "connect"` and the
+interface's address in `"host"`. The former stand-alone bridge (`live-scoreboard`) must not run next to the panel:
+both would want port 4001 and both would write the title.
+
+**Score (SPIELSTAND).** In both modes the panel counts the score itself; it is not taken from the Scorepad. TOR on a
+player shows the goal graphic and counts +1, so the clock has the right score at once. The block SPIELSTAND in the
+Matchuhr group corrects it with `−1` / `+1` (keys `H` / `G`, with Shift one off); SPIELSTAND AUF 0:0 starts a new
+game. A note appears when the Scorepad shows a different score.
+
+**Match clock by hand (VON HAND).** If the link fails, the switch
+on the Einblender screen hands the title to the operator: the clock carries on from the time, period and
+penalties the scoreboard last gave, and from then on the panel writes game time (counts up, stops at `scoreboard.manual.periodMinutes`),
+period and two penalties per team (they run with the game time and vanish at 00:00). A goal leaves the clock running;
+set `stopOnGoal` to `true` to have a goal stop it. UHR ZURÜCKSETZEN puts time, period and penalties back to the
+start and leaves the score. Back on ANZEIGETAFEL the scoreboard's data is written again.
+Without a `scoreboard.bodet` block the panel writes nothing in that mode and another program has to fill the title.
 
 Keyboard on the desktop (listed at the bottom of the screen): `Esc` takes the graphic off, `N` brings on the next
 player of the starting six, `M` puts the match clock on or off. With the clock by hand: space starts and stops it,
@@ -141,6 +166,7 @@ ends up in vMix's recording folder. Clip lengths come from vMix, the scene lengt
 | --- | --- |
 | `cams[].input` | vMix input name (or number / GUID) of each camera. Anywhere an input is named, `Name*` matches by prefix, which is needed for list inputs whose title includes the current item. `replayCamera` is its camera number 1–8 in vMix Replay. vMix plays the angles of an event in that order, so the camera that should come first needs the lowest number. |
 | `scoreboard` | Title input and its field names for score, period, clock and team names. `overlay` is the overlay channel it runs on. Remove the block if there is none. |
+| `scoreboard.bodet` | Link to the Bodet Scorepad: `enabled`, `mode` (`listen`: the Scorepad connects to this computer; `connect`: the panel dials the interface at `host`), `port` (4001), `staleMs` (5000: no data for this long counts as lost), `overtime` (period field during extra time, `O`), `timeoutGraphic`. Remove the block if another program fills the clock title. |
 | `replay.seconds` | Length of a marked replay (seconds back from live). |
 | `replay.fps` | Frame rate of the vMix project. In and out points are moved in frames, so one second is this many. |
 | `replay.marks` | The mark buttons and which cameras each one keeps in the event. |
@@ -196,12 +222,16 @@ and the panel's replay list (also needed after a test run on match day).
 ```
 pnpm install
 pnpm mock       # fake vMix API on :8088, for working without vMix
+pnpm bodet      # fake Scorepad that connects to the panel on :4001, driven from the keyboard (? lists the keys)
 pnpm dev        # server on :8090 + Vite with hot reload on :5173
+pnpm test       # Scorepad protocol and clock title
 pnpm build      # typecheck, build client to dist/public, bundle server to dist/server.cjs
 ```
 
 The package manager is pnpm (`packageManager` in `package.json`; `corepack enable` provides it). `node_modules`
-is laid out flat (`pnpm-workspace.yaml`) because the project lives in a synced folder.
+is laid out flat (`pnpm-workspace.yaml`) because the project lives in a synced folder. `VMIX_HOST`, `VMIX_PORT`,
+`PORT` and `BODET_PORT` override `config.json`, e.g. `VMIX_HOST=127.0.0.1 pnpm dev` against the fake vMix.
+`pnpm bodet --auto --speed 20` plays a match by itself.
 
 Stack: React 19, TypeScript, Vite, Tailwind CSS 4, shadcn/ui (Radix) on the client; Hono + zod on the server.
 `shared/` holds the action schemas and state types both sides use. State reaches the phones via server-sent events.

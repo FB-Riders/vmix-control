@@ -4,7 +4,7 @@ import type { GfxRequest, GfxSide } from '@shared/actions';
 import type { GfxState, GfxTeam, OverlayState, PanelState } from '@shared/state';
 import { Caption } from '@/components/caption';
 import { Button } from '@/components/ui/button';
-import { ScoreboardMode, ScoreboardPanel } from '@/components/scoreboard';
+import { BodetStatus, ScoreboardMode, ScoreboardPanel, ScoreCount } from '@/components/scoreboard';
 import { ShootoutPanel } from '@/components/shootout';
 import { SponsorPanel } from '@/components/sponsor';
 import { Input } from '@/components/ui/input';
@@ -26,7 +26,7 @@ async function readText(file: File): Promise<string> {
   try { return new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch { return new TextDecoder('windows-1252').decode(bytes); }
 }
 
-function Team({ side, team, gfx, manual }: { side: GfxSide; team: GfxTeam; gfx: GfxState; manual: boolean }) {
+function Team({ side, team, gfx, manual, counts }: { side: GfxSide; team: GfxTeam; gfx: GfxState; manual: boolean; counts: boolean }) {
   const [nr, setNr] = useState<string | null>(null);
   const player = team.players.find((p) => p.nr === nr);
   const six = gfx.live?.kind === 'startingSix' && gfx.live.team === side ? gfx.live.six : null;
@@ -38,7 +38,7 @@ function Team({ side, team, gfx, manual }: { side: GfxSide; team: GfxTeam; gfx: 
 
       <div className="flex flex-col gap-2">
         <span className="text-xs font-light text-muted-foreground">
-          {player ? `${player.nr} · ${player.name}${player.top ? ' · Topskorer' : ''}` : manual ? 'Spielerin wählen. TOR zählt +1, die Uhr läuft weiter. Strafe: mit Spielerin Einblender und Uhr, ohne nur Uhr.' : 'Spielerin wählen, dann Einblender'}
+          {player ? `${player.nr} · ${player.name}${player.top ? ' · Topskorer' : ''}` : manual ? 'Spielerin wählen. TOR zählt +1, die Uhr läuft weiter. Strafe: mit Spielerin Einblender und Uhr, ohne nur Uhr.' : counts ? 'Spielerin wählen. TOR zählt +1 auf der Matchuhr.' : 'Spielerin wählen, dann Einblender'}
         </span>
         <div className="grid grid-cols-8 gap-1.5">
           {team.players.map((p) => (
@@ -56,7 +56,7 @@ function Team({ side, team, gfx, manual }: { side: GfxSide; team: GfxTeam; gfx: 
           ))}
         </div>
         <div className="grid grid-cols-3 gap-1.5">
-          <Button className="h-11 text-[13px] font-black" disabled={!nr} onClick={() => show({ kind: 'goal', team: side, player: nr ?? undefined })}>{manual ? 'TOR +1' : 'TOR'}</Button>
+          <Button className="h-11 text-[13px] font-black" disabled={!nr} onClick={() => show({ kind: 'goal', team: side, player: nr ?? undefined })}>{counts ? 'TOR +1' : 'TOR'}</Button>
           <Button variant="outline" className={cn(action, soft)} disabled={!nr} onClick={() => show({ kind: 'name', team: side, player: nr ?? undefined })}>NAME</Button>
           <Button variant="outline" className={cn(action, soft)} disabled={!nr} onClick={() => show({ kind: 'bestPlayer', team: side, player: nr ?? undefined })}>BEST PLAYER</Button>
         </div>
@@ -76,7 +76,7 @@ function Team({ side, team, gfx, manual }: { side: GfxSide; team: GfxTeam; gfx: 
           ))}
         </div>
         <div className="grid grid-cols-2 gap-1.5">
-          <Button variant="outline" className={cn(action, soft)} onClick={() => show({ kind: 'goal', team: side, player: 'own' })}>{manual ? 'EIGENTOR +1' : 'EIGENTOR'}</Button>
+          <Button variant="outline" className={cn(action, soft)} onClick={() => show({ kind: 'goal', team: side, player: 'own' })}>{counts ? 'EIGENTOR +1' : 'EIGENTOR'}</Button>
           <Button variant="outline" className={cn(action, soft)} onClick={() => show({ kind: 'timeout', team: side })}>TIME OUT</Button>
         </div>
       </div>
@@ -217,11 +217,11 @@ export function GfxPage({ state, embedded }: { state: PanelState; embedded?: boo
           <Key keys={GFX_KEYS.hide}>Einblender aus</Key>
           <Key keys={GFX_KEYS.next}>Starting 6 weiter</Key>
           {scoreboard && <Key keys={GFX_KEYS.clock}>Matchuhr ein / aus</Key>}
+          {scoreboard?.counts && <Key keys={`${GFX_KEYS.home} ${GFX_KEYS.away}`}>Tor Heim / Gast, mit ⇧ ein Tor weg</Key>}
           {scoreboard?.manual && (
             <>
               <Key keys={GFX_KEYS.run}>Uhr Start / Stopp</Key>
               <Key keys={GFX_KEYS.second}>±1 s, mit ⇧ ±10 s</Key>
-              <Key keys={`${GFX_KEYS.home} ${GFX_KEYS.away}`}>Tor Heim / Gast, mit ⇧ ein Tor weg</Key>
               {clockPenalties && <Key keys={clockPenalties}>Strafe Heim auf die Uhr, mit ⇧ Gast</Key>}
             </>
           )}
@@ -248,7 +248,14 @@ export function GfxPage({ state, embedded }: { state: PanelState; embedded?: boo
             )}
           >
             <ScoreboardMode scoreboard={scoreboard} />
+            {!scoreboard.manual && <BodetStatus scoreboard={scoreboard} teams={names} />}
             {scoreboard.manual && <ScoreboardPanel scoreboard={scoreboard} teams={names} add={teams ? undefined : gfx.penalties} />}
+            {scoreboard.counts && (
+              <>
+                <Label title="SPIELSTAND" className="mt-3" />
+                <ScoreCount scoreboard={scoreboard} teams={names} />
+              </>
+            )}
             {shootout && (
               <>
                 <Label title="PENALTY-SCHIESSEN" className="mt-3">
@@ -294,8 +301,8 @@ export function GfxPage({ state, embedded }: { state: PanelState; embedded?: boo
 
           {gfx.home && gfx.away ? (
             <div className="mt-3 grid items-start gap-6 min-[1000px]:grid-cols-2">
-              <Team side="home" team={gfx.home} gfx={gfx} manual={!!scoreboard?.manual} />
-              <Team side="away" team={gfx.away} gfx={gfx} manual={!!scoreboard?.manual} />
+              <Team side="home" team={gfx.home} gfx={gfx} manual={!!scoreboard?.manual} counts={!!scoreboard?.counts} />
+              <Team side="away" team={gfx.away} gfx={gfx} manual={!!scoreboard?.manual} counts={!!scoreboard?.counts} />
             </div>
           ) : (
             <span className="text-sm leading-relaxed font-light text-muted-foreground">

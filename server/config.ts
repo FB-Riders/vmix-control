@@ -66,6 +66,16 @@ const configSchema = z.object({
       penaltyColor: z.string().default('#FFF000FF'), // box of a running penalty, as in the title: red, green, blue, opacity
       periods: z.array(z.string()).default(['1', '2', '3', 'O', 'P']),
     }).prefault({}),
+    // The link to the hall's Bodet Scorepad. Without it another program has to fill the clock title.
+    bodet: z.object({
+      enabled: z.boolean().default(true),
+      mode: z.enum(['listen', 'connect']).default('listen'), // listen: the Scorepad connects to this computer; connect: the panel dials the RJ45/RS232 interface
+      host: z.string().default(''), // listen: address to bind (empty = all); connect: address of the interface
+      port: z.number().int().min(1).max(65535).default(4001),
+      staleMs: z.number().positive().default(5000),
+      overtime: z.string().default('O'), // period field during extra time, as the clock by hand shows it
+      timeoutGraphic: z.boolean().default(true), // a time-out on the console fades the team's time-out graphic in and out
+    }).optional(),
     overlay: z.number().int().min(1).max(8).optional(),
   }).optional(),
   replay: z.object({
@@ -93,6 +103,7 @@ const configSchema = z.object({
     sources: z.array(z.object({ id: z.string(), name: z.string(), short: z.string(), input: z.string(), role: z.enum(['commentary', 'atmo']).optional() })).min(1),
     music: z.object({ name: z.string(), input: z.string() }).optional(), // background music with its own play/pause control
     breakVideo: z.string().optional(), // break video whose sound can be swapped for the music
+    breakSound: z.enum(['video', 'music']).default('video'), // what a break starts with: the video's own sound, or the video muted under the music list
     loudnessTarget: z.number().default(-16),
     loudnessTolerance: z.number().default(3),
     loudnessOffset: z.number().default(0), // calibration of the estimate against a real loudness meter
@@ -103,7 +114,6 @@ const configSchema = z.object({
     overlay: z.number().int().min(1).max(8),
     intervalSec: z.number().positive(), // automatic rotation: from one fade-in to the next
     durationSec: z.number().positive(),
-    breakSound: z.enum(['video', 'music']).default('video'), // what a break starts with: the video's own sound, or the video muted under the music list
     // Sponsors put into the first input (the league's sponsor title) one at a time: button label, heading above the
     // logo, full path of the logo on the vMix computer. Empty = the inputs are shown as they are.
     list: z.array(z.object({ label: z.string(), title: z.string().default(''), picture: z.string() })).max(8).default([]),
