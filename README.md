@@ -10,6 +10,14 @@ The panel does these tasks:
 - It shows the on-screen graphics. It replaces TC Unihockey.
 - It monitors the stream for the controlling (audio, loudness, logos, clips).
 
+![The live screen: cameras, audio and replays](docs/screenshots/live.png)
+
+| Before the game | On-screen graphics |
+| --- | --- |
+| ![The test run of the pre-game sequence, with the line-up on air](docs/screenshots/vor.png) | ![A goal graphic on air, with the match clock from the Scorepad](docs/screenshots/einblender.png) |
+| **After the game** | **On a phone** |
+| ![The highlight video, built from goals and starred replays](docs/screenshots/nach.png) | <img src="docs/screenshots/phone.png" alt="The on-screen graphics on a phone" width="220"> |
+
 ## Install
 
 You need a Windows computer with vMix and [Node.js](https://nodejs.org) LTS.
