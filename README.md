@@ -249,3 +249,7 @@ is laid out flat (`pnpm-workspace.yaml`) because the project lives in a synced f
 
 Stack: React 19, TypeScript, Vite, Tailwind CSS 4, shadcn/ui (Radix) on the client; Hono + zod on the server.
 `shared/` holds the action schemas and state types both sides use. State reaches the phones via server-sent events.
+
+## License
+
+MIT, see [LICENSE](LICENSE). Provided as is, without warranty.
