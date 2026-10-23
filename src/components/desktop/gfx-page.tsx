@@ -229,7 +229,7 @@ export function GfxPage({ state, embedded }: { state: PanelState; embedded?: boo
       )}
     >
       {/* Wide: the Einblender (overlay 2) fill the right two thirds, the other overlays stack on the left. */}
-      <div className="grid items-start gap-x-6 gap-y-8 min-[1000px]:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] min-[1000px]:grid-rows-[auto_auto_auto_auto_1fr]">
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-x-6 gap-y-8 min-[1000px]:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] min-[1000px]:grid-rows-[auto_auto_auto_auto_1fr]">
         <input ref={fileInput} type="file" accept=".txt,text/plain" className="hidden" onChange={(e) => load(e.target.files?.[0])} />
 
         {/* Without a game there is little to show: loading it comes first. */}
@@ -300,7 +300,7 @@ export function GfxPage({ state, embedded }: { state: PanelState; embedded?: boo
           )}
 
           {gfx.home && gfx.away ? (
-            <div className="mt-3 grid items-start gap-6 min-[1000px]:grid-cols-2">
+            <div className="mt-3 grid grid-cols-[minmax(0,1fr)] items-start gap-6 min-[1000px]:grid-cols-2">
               <Team side="home" team={gfx.home} gfx={gfx} manual={!!scoreboard?.manual} counts={!!scoreboard?.counts} />
               <Team side="away" team={gfx.away} gfx={gfx} manual={!!scoreboard?.manual} counts={!!scoreboard?.counts} />
             </div>
@@ -310,7 +310,7 @@ export function GfxPage({ state, embedded }: { state: PanelState; embedded?: boo
             </span>
           )}
 
-          <div className="mt-3 grid items-start gap-6 min-[1000px]:grid-cols-2">
+          <div className="mt-3 grid grid-cols-[minmax(0,1fr)] items-start gap-6 min-[1000px]:grid-cols-2">
             <div className="flex flex-col gap-3">
               <Label title="FREIER TEXT" />
               <div className="flex gap-2">
