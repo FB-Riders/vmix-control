@@ -73,9 +73,12 @@ function readGame(sections: Record<string, Record<string, string>>): Game {
   const team = (s: Record<string, string>): Team => {
     const players: Record<string, string> = {};
     for (const [k, v] of Object.entries(s)) if (/^\d+$/.test(k) && k !== TOPSCORER && v) players[k] = v;
+    // The generator usually files the top scorer under 00 instead of the shirt number; older configs list them twice.
+    const topscorer = s[TOPSCORER] ?? '';
+    if (topscorer && !Object.values(players).includes(topscorer)) players[TOPSCORER] = topscorer;
     return {
       long: s.TeamLong ?? '', short: s.TeamShort ?? '', coach: s.Headcoach ?? s.Coach ?? '',
-      players, topscorer: s[TOPSCORER] ?? '',
+      players, topscorer,
       lines: [s.Line1, s.Line2, s.Line3, s.Line4].map(list),
       goalies: list(s.Goal),
       starting: list(s.Starting6),

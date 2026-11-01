@@ -104,7 +104,8 @@ add e.g. `"timeout": 8`, or remove an entry to keep that graphic on). All others
 The bar behind a title's top and bottom line (`RectTop` / `RectBottom`) is shown in `graphics.barColor` while the
 line has text and made transparent while it is empty; the titles leave that to the sender.
 
-Names are written in capitals; a player whose name is filed under `00` gets the top scorer icon. Team logos are
+Names are written in capitals; a player whose name is filed under `00` gets the top scorer icon. If the config has no
+other number for that player, the button on the Einblender screen says `00` and the title shows the icon without a number. Team logos are
 only set if `graphics.logoPath` names the folder with `<TeamShort>.png` on the vMix computer. Labels
 (`graphics.labels`), penalty lengths and shortcut texts are in `config.json`. `dev/examples/` holds the league's
 example game config.
