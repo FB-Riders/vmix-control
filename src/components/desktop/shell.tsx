@@ -1,4 +1,4 @@
-import type { PanelState } from '@shared/state';
+import type { OverlayState, PanelState } from '@shared/state';
 import { Caption } from '@/components/caption';
 import { OverlayStrip } from '@/components/overlays';
 import { Indicator } from '@/components/live/status-header';
@@ -8,20 +8,21 @@ import { useNow } from '@/hooks/use-now';
 import { hhmmss } from '@/lib/time';
 import { cn } from '@/lib/utils';
 
-export type DesktopView = 'vor' | 'live' | 'grafik' | 'pause' | 'nach';
+export type DesktopView = 'vor' | 'live' | 'grafik' | 'matchuhr' | 'pause' | 'nach';
 const VIEWS: { id: DesktopView; label: string }[] = [
   { id: 'vor', label: 'VOR DEM SPIEL' },
   { id: 'live', label: 'LIVE' },
   { id: 'grafik', label: 'EINBLENDER' },
+  { id: 'matchuhr', label: 'MATCHUHR' },
   { id: 'pause', label: 'PAUSE' },
   { id: 'nach', label: 'NACH DEM SPIEL' },
 ];
 
 /** The phases of a match day as tabs across the top. */
-function PhaseTabs({ view, streaming }: { view: DesktopView; streaming: boolean }) {
+function PhaseTabs({ view, streaming, clock }: { view: DesktopView; streaming: boolean; clock: boolean }) {
   return (
-    <nav aria-label="Phase" className="grid grid-cols-5 border-b">
-      {VIEWS.map((v, i) => (
+    <nav aria-label="Phase" className="grid auto-cols-fr grid-flow-col border-b">
+      {VIEWS.filter((v) => clock || v.id !== 'matchuhr').map((v, i) => (
         <a
           key={v.id}
           href={`#${v.id}`}
@@ -49,6 +50,30 @@ export function Label({ title, hint, live, className, children }: { title: strin
   );
 }
 
+export function Key({ keys, children }: { keys: string; children: string }) {
+  return <span><span className="font-semibold text-foreground">{keys}</span> {children}</span>;
+}
+
+/** Everything that goes on one vMix overlay channel, under a heading that says what the channel shows right now. */
+export function Group({ channel, title, overlays, action, className, children }: { channel: number; title: string; overlays: OverlayState[]; action?: React.ReactNode; className?: string; children?: React.ReactNode }) {
+  const o = overlays.find((x) => x.channel === channel);
+  const status = o?.on ? (o.text && o.text !== o.role ? o.text : 'eingeblendet') : o?.paused ? 'kommt von selbst zurück' : 'aus';
+  return (
+    <section aria-label={`Overlay ${channel}: ${title}`} className={cn('flex min-w-0 flex-col gap-3', className)}>
+      <div className="flex min-h-11 flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-b-2 border-muted-foreground pb-2">
+        <div className="flex min-w-0 flex-col">
+          <span className="text-[15px] font-black tracking-widest">{title}</span>
+          <span className={cn('truncate text-xs tabular-nums', o?.on ? 'font-semibold' : 'font-light text-muted-foreground')}>
+            <span className={o?.on ? 'text-primary' : 'text-input'}>●</span> Overlay {channel} · {status}
+          </span>
+        </div>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 interface Props {
   state: PanelState;
   view: DesktopView;
@@ -66,7 +91,7 @@ export function DesktopShell({ state, view, header, footer, children, embedded }
 
   return (
     <div className={cn('flex flex-col', !embedded && 'min-h-full')}>
-      {!embedded && <PhaseTabs view={view} streaming={state.streaming} />}
+      {!embedded && <PhaseTabs view={view} streaming={state.streaming} clock={!!state.scoreboard} />}
       <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b px-6 py-3.5">
         <div className="flex flex-wrap items-center gap-4">
           <Badge variant={state.streaming ? 'default' : 'secondary'} className="h-auto rounded-sm px-2.5 py-[5px] text-sm font-black tracking-widest">

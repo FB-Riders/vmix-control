@@ -45,7 +45,7 @@ export function useHotkeys(state: PanelState | null, marking: Marking, scope: 'l
 }
 
 /**
- * Keyboard control for the Einblender screen on the desktop, above all for the match clock by hand:
+ * Keyboard control for the Einblender and Matchuhr screens on the desktop, above all for the match clock by hand:
  * space starts and stops it, the arrows correct the time, H and G count goals, the penalty minutes start a penalty.
  * Shift turns a key around (10 s instead of 1, a goal off) or makes it act for the away team (penalties).
  */

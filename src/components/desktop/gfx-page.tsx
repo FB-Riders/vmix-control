@@ -1,18 +1,17 @@
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { GfxRequest, GfxSide } from '@shared/actions';
-import type { GfxState, GfxTeam, OverlayState, PanelState } from '@shared/state';
+import type { GfxState, GfxTeam, PanelState } from '@shared/state';
 import { Caption } from '@/components/caption';
 import { Button } from '@/components/ui/button';
-import { BodetStatus, ScoreboardMode, ScoreboardPanel, ScoreCount } from '@/components/scoreboard';
-import { ShootoutPanel } from '@/components/shootout';
+import { ClockNotice } from '@/components/scoreboard';
 import { SponsorPanel } from '@/components/sponsor';
 import { Input } from '@/components/ui/input';
 import { useNow } from '@/hooks/use-now';
 import { act } from '@/lib/api';
 import { GFX_KEYS, penaltyKey } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import { DesktopShell, Label } from './shell';
+import { DesktopShell, Group, Key, Label } from './shell';
 
 const show = (req: GfxRequest) => act('gfx/show', req);
 const soft = 'border-2 border-secondary bg-secondary font-black';
@@ -26,63 +25,98 @@ async function readText(file: File): Promise<string> {
   try { return new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch { return new TextDecoder('windows-1252').decode(bytes); }
 }
 
-function Team({ side, team, gfx, manual, counts }: { side: GfxSide; team: GfxTeam; gfx: GfxState; manual: boolean; counts: boolean }) {
+/** During the game, in reading order: which team, which player, what happened. Afterwards it starts over at the team. */
+function PlayerEvents({ home, away, gfx, manual, counts }: { home: GfxTeam; away: GfxTeam; gfx: GfxState; manual: boolean; counts: boolean }) {
+  const [side, setSide] = useState<GfxSide | null>(null);
   const [nr, setNr] = useState<string | null>(null);
-  const player = team.players.find((p) => p.nr === nr);
+  const team = side === 'home' ? home : side === 'away' ? away : null;
+  const player = team?.players.find((p) => p.nr === nr);
+  const action = 'h-11 px-0 text-[13px]';
+
+  function pick(next: GfxSide) {
+    setSide(next);
+    if (next !== side) setNr(null);
+  }
+  /** A failed action keeps the choice, so it can simply be tried again. */
+  async function fire(run: Promise<unknown>) {
+    if (!await run) return;
+    setSide(null);
+    setNr(null);
+  }
+
+  return (
+    <div className="mt-3 flex flex-col gap-3">
+      <Label title="1 · TEAM" />
+      <div className="grid grid-cols-2 gap-1.5">
+        {([['home', 'HEIM', home], ['away', 'GAST', away]] as const).map(([id, label, t]) => (
+          <Button key={id} variant="outline" className={cn('h-14 min-w-0 flex-col gap-0 border-2 px-2', side === id ? picked : 'border-secondary bg-secondary')} aria-pressed={side === id} onClick={() => pick(id)}>
+            <span className="text-[11px] font-medium tracking-widest">{label}</span>
+            <span className="max-w-full truncate text-sm font-black">{t.long.toUpperCase()}</span>
+          </Button>
+        ))}
+      </div>
+
+      <Label title="2 · SPIELERIN" className="mt-1" hint={player ? `${player.nr} · ${player.name}${player.top ? ' · Topskorer' : ''}` : undefined} />
+      {team ? (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(132px,1fr))] gap-1.5">
+          {team.players.map((p) => (
+            <Button
+              key={p.nr}
+              variant="outline"
+              className={cn('h-11 min-w-0 justify-start gap-2 border px-2', p.nr === nr ? picked : 'border-secondary bg-secondary')}
+              aria-pressed={p.nr === nr}
+              title={p.name}
+              onClick={() => setNr(p.nr === nr ? null : p.nr)}
+            >
+              <span className="w-6 shrink-0 text-right text-sm font-black tabular-nums">{p.nr}</span>
+              <span className="truncate text-xs font-medium">{p.name}</span>
+            </Button>
+          ))}
+        </div>
+      ) : (
+        <span className="text-xs font-light text-muted-foreground">Zuerst das Team wählen.</span>
+      )}
+
+      <Label title="3 · EREIGNIS" className="mt-1" />
+      <span className="text-xs font-light text-muted-foreground">
+        {manual ? 'TOR zählt +1, die Uhr läuft weiter. Strafe: mit Spielerin Einblender und Uhr, ohne nur Uhr.' : counts ? 'TOR zählt +1 auf der Matchuhr.' : 'Ein Knopf blendet direkt ein.'}
+      </span>
+      <div className="grid grid-cols-3 gap-1.5">
+        <Button className="h-11 text-[13px] font-black" disabled={!player} onClick={() => side && fire(show({ kind: 'goal', team: side, player: nr ?? undefined }))}>{counts ? 'TOR +1' : 'TOR'}</Button>
+        <Button variant="outline" className={cn(action, soft)} disabled={!player} onClick={() => side && fire(show({ kind: 'name', team: side, player: nr ?? undefined }))}>NAME</Button>
+        <Button variant="outline" className={cn(action, soft)} disabled={!player} onClick={() => side && fire(show({ kind: 'bestPlayer', team: side, player: nr ?? undefined }))}>BEST PLAYER</Button>
+      </div>
+      <div className="grid auto-cols-fr grid-flow-col gap-1.5">
+        {gfx.penalties.map((p) => (
+          <Button
+            key={p}
+            variant="outline"
+            className={cn(action, soft)}
+            disabled={!side || (!player && !manual)}
+            aria-label={player || !manual ? `Strafe ${p}` : `Strafe ${p} nur auf die Matchuhr`}
+            // By hand without a player: the penalty only goes on the clock (e.g. a bench penalty).
+            onClick={() => side && fire(player ? show({ kind: 'penalty', team: side, player: player.nr, value: p }) : act('scoreboard/addPenalty', { team: side, label: p }))}
+          >
+            {p}
+          </Button>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-1.5">
+        <Button variant="outline" className={cn(action, soft)} disabled={!side} onClick={() => side && fire(show({ kind: 'goal', team: side, player: 'own' }))}>{counts ? 'EIGENTOR +1' : 'EIGENTOR'}</Button>
+        <Button variant="outline" className={cn(action, soft)} disabled={!side} onClick={() => side && fire(show({ kind: 'timeout', team: side }))}>TIME OUT</Button>
+      </div>
+    </div>
+  );
+}
+
+/** Before the game, per team: line-up, coach, starting six. */
+function TeamPrep({ side, team, gfx }: { side: GfxSide; team: GfxTeam; gfx: GfxState }) {
   const six = gfx.live?.kind === 'startingSix' && gfx.live.team === side ? gfx.live.six : null;
   const action = 'h-11 px-0 text-[13px]';
 
   return (
     <div className="flex flex-col gap-3">
-      <Label title={`${side === 'home' ? 'HEIM' : 'GAST'} · ${team.long.toUpperCase()}`} hint={team.short} />
-
-      <div className="flex flex-col gap-2">
-        <span className="text-xs font-light text-muted-foreground">
-          {player ? `${player.nr} · ${player.name}${player.top ? ' · Topskorer' : ''}` : manual ? 'Spielerin wählen. TOR zählt +1, die Uhr läuft weiter. Strafe: mit Spielerin Einblender und Uhr, ohne nur Uhr.' : counts ? 'Spielerin wählen. TOR zählt +1 auf der Matchuhr.' : 'Spielerin wählen, dann Einblender'}
-        </span>
-        <div className="grid grid-cols-8 gap-1.5">
-          {team.players.map((p) => (
-            <Button
-              key={p.nr}
-              variant="outline"
-              className={cn('h-10 border px-0 text-sm font-black tabular-nums', p.nr === nr ? picked : 'border-secondary bg-secondary')}
-              aria-pressed={p.nr === nr}
-              aria-label={`${p.nr} ${p.name}`}
-              title={p.name}
-              onClick={() => setNr(p.nr === nr ? null : p.nr)}
-            >
-              {p.nr}
-            </Button>
-          ))}
-        </div>
-        <div className="grid grid-cols-3 gap-1.5">
-          <Button className="h-11 text-[13px] font-black" disabled={!nr} onClick={() => show({ kind: 'goal', team: side, player: nr ?? undefined })}>{counts ? 'TOR +1' : 'TOR'}</Button>
-          <Button variant="outline" className={cn(action, soft)} disabled={!nr} onClick={() => show({ kind: 'name', team: side, player: nr ?? undefined })}>NAME</Button>
-          <Button variant="outline" className={cn(action, soft)} disabled={!nr} onClick={() => show({ kind: 'bestPlayer', team: side, player: nr ?? undefined })}>BEST PLAYER</Button>
-        </div>
-        <div className="grid auto-cols-fr grid-flow-col gap-1.5">
-          {gfx.penalties.map((p) => (
-            <Button
-              key={p}
-              variant="outline"
-              className={cn(action, soft)}
-              disabled={!nr && !manual}
-              aria-label={nr || !manual ? `Strafe ${p}` : `Strafe ${p} nur auf die Matchuhr`}
-              // By hand without a player: the penalty only goes on the clock (e.g. a bench penalty).
-              onClick={() => (nr ? show({ kind: 'penalty', team: side, player: nr, value: p }) : act('scoreboard/addPenalty', { team: side, label: p }))}
-            >
-              {p}
-            </Button>
-          ))}
-        </div>
-        <div className="grid grid-cols-2 gap-1.5">
-          <Button variant="outline" className={cn(action, soft)} onClick={() => show({ kind: 'goal', team: side, player: 'own' })}>{counts ? 'EIGENTOR +1' : 'EIGENTOR'}</Button>
-          <Button variant="outline" className={cn(action, soft)} onClick={() => show({ kind: 'timeout', team: side })}>TIME OUT</Button>
-        </div>
-      </div>
-
-      {/* Before the game. */}
-      <Label title="VOR DEM SPIEL" className="mt-3" />
+      <Label title={`VOR DEM SPIEL · ${side === 'home' ? 'HEIM' : 'GAST'}`} hint={team.short} />
       <div className="grid grid-cols-2 gap-1.5">
         <Button variant="outline" className={cn(action, soft)} onClick={() => show({ kind: 'lineup', team: side })}>AUFSTELLUNG</Button>
         <Button variant="outline" className={cn(action, soft)} disabled={!team.coach} onClick={() => show({ kind: 'coach', team: side })}>COACH</Button>
@@ -117,36 +151,11 @@ function Team({ side, team, gfx, manual, counts }: { side: GfxSide; team: GfxTea
   );
 }
 
-function Key({ keys, children }: { keys: string; children: string }) {
-  return <span><span className="font-semibold text-foreground">{keys}</span> {children}</span>;
-}
-
-/** Everything that goes on one vMix overlay channel, under a heading that says what the channel shows right now. */
-function Group({ channel, title, overlays, action, className, children }: { channel: number; title: string; overlays: OverlayState[]; action?: React.ReactNode; className?: string; children?: React.ReactNode }) {
-  const o = overlays.find((x) => x.channel === channel);
-  const status = o?.on ? (o.text && o.text !== o.role ? o.text : 'eingeblendet') : o?.paused ? 'kommt von selbst zurück' : 'aus';
-  return (
-    <section aria-label={`Overlay ${channel}: ${title}`} className={cn('flex min-w-0 flex-col gap-3', className)}>
-      <div className="flex min-h-11 flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-b-2 border-muted-foreground pb-2">
-        <div className="flex min-w-0 flex-col">
-          <span className="text-[15px] font-black tracking-widest">{title}</span>
-          <span className={cn('truncate text-xs tabular-nums', o?.on ? 'font-semibold' : 'font-light text-muted-foreground')}>
-            <span className={o?.on ? 'text-primary' : 'text-input'}>●</span> Overlay {channel} · {status}
-          </span>
-        </div>
-        {action}
-      </div>
-      {children}
-    </section>
-  );
-}
-
 /** On-screen graphics from the game config: opener, people, line-ups, starting six, goals, penalties, results. */
 export function GfxPage({ state, embedded }: { state: PanelState; embedded?: boolean }) {
   const { gfx } = state;
   const fileInput = useRef<HTMLInputElement>(null);
   const [text, setText] = useState('');
-  const [shootoutOpen, setShootoutOpen] = useState(false);
   const now = useNow();
 
   async function load(file: File | undefined) {
@@ -182,10 +191,9 @@ export function GfxPage({ state, embedded }: { state: PanelState; embedded?: boo
     </div>
   );
 
-  const { scoreboard, shootout, sponsor, overlays } = state;
+  const { scoreboard, sponsor, overlays } = state;
   const names = { home: gfx.home?.long ?? 'Heim', away: gfx.away?.long ?? 'Gast' };
   const teams = !!gfx.home && !!gfx.away;
-  const clockChannel = shootout?.overlay ?? overlays.find((o) => o.role === 'Matchuhr')?.channel ?? 1;
   const logoChannel = overlays.find((o) => o.role === 'Logos')?.channel;
   const clockPenalties = gfx.penalties.map(penaltyKey).filter(Boolean).join(' ');
   const left = 'min-[1000px]:col-start-1';
@@ -235,44 +243,6 @@ export function GfxPage({ state, embedded }: { state: PanelState; embedded?: boo
         {/* Without a game there is little to show: loading it comes first. */}
         {!game && config}
 
-        {scoreboard && (
-          <Group
-            channel={clockChannel}
-            title="MATCHUHR"
-            overlays={overlays}
-            className={left}
-            action={!shootout?.live && (
-              <Button variant="outline" className={small} aria-pressed={scoreboard.onAir} onClick={() => act('scoreboard/show', { on: !scoreboard.onAir })}>
-                {scoreboard.onAir ? 'AUSBLENDEN' : 'EINBLENDEN'}
-              </Button>
-            )}
-          >
-            <ScoreboardMode scoreboard={scoreboard} />
-            {!scoreboard.manual && <BodetStatus scoreboard={scoreboard} teams={names} />}
-            {scoreboard.manual && <ScoreboardPanel scoreboard={scoreboard} teams={names} add={teams ? undefined : gfx.penalties} />}
-            {scoreboard.counts && (
-              <>
-                <Label title="SPIELSTAND" className="mt-3" />
-                <ScoreCount scoreboard={scoreboard} teams={names} />
-              </>
-            )}
-            {shootout && (
-              <>
-                <Label title="PENALTY-SCHIESSEN" className="mt-3">
-                  {!shootout.live && (
-                    <Button variant="outline" className={cn(small, 'h-8 bg-background')} aria-expanded={shootoutOpen} onClick={() => setShootoutOpen(!shootoutOpen)}>
-                      {shootoutOpen ? 'ZUKLAPPEN' : 'AUFKLAPPEN'}
-                    </Button>
-                  )}
-                </Label>
-                {shootout.live || shootoutOpen
-                  ? <ShootoutPanel shootout={shootout} home={names.home} away={names.away} />
-                  : <span className="text-xs font-light text-muted-foreground">Die Anzeige mit fünf Kreisen pro Team kommt anstelle der Matchuhr ins Bild.</span>}
-              </>
-            )}
-          </Group>
-        )}
-
         <Group channel={gfx.overlay} title="EINBLENDER" overlays={overlays} className="min-[1000px]:col-start-2 min-[1000px]:row-span-5 min-[1000px]:row-start-1">
           {live ? (
             <Button className="h-20 flex-col gap-0.5 whitespace-normal" onClick={() => act('gfx/hide')}>
@@ -286,9 +256,13 @@ export function GfxPage({ state, embedded }: { state: PanelState; embedded?: boo
             </div>
           )}
 
+          {scoreboard && <ClockNotice scoreboard={scoreboard} />}
+
+          {gfx.home && gfx.away && <PlayerEvents home={gfx.home} away={gfx.away} gfx={gfx} manual={!!scoreboard?.manual} counts={!!scoreboard?.counts} />}
+
           {game && (
             <>
-              <Label title="RESULTAT" hint={gfx.score ? `${gfx.score.home}:${gfx.score.away} ${gfx.periods}` : 'Matchuhr nicht lesbar'} />
+              <Label title="RESULTAT" className="mt-3" hint={gfx.score ? `${gfx.score.home}:${gfx.score.away} ${gfx.periods}` : 'Matchuhr nicht lesbar'} />
               <div className="grid grid-cols-3 gap-1.5 min-[1000px]:grid-cols-6">
                 {gfx.results.map((r) => (
                   <Button key={r.id} variant="outline" className={cn('h-11 px-1 text-[11px] whitespace-normal', soft)} disabled={!gfx.score} onClick={() => show({ kind: 'result', value: r.id })}>
@@ -300,10 +274,12 @@ export function GfxPage({ state, embedded }: { state: PanelState; embedded?: boo
           )}
 
           {gfx.home && gfx.away ? (
-            <div className="mt-3 grid grid-cols-[minmax(0,1fr)] items-start gap-6 min-[1000px]:grid-cols-2">
-              <Team side="home" team={gfx.home} gfx={gfx} manual={!!scoreboard?.manual} counts={!!scoreboard?.counts} />
-              <Team side="away" team={gfx.away} gfx={gfx} manual={!!scoreboard?.manual} counts={!!scoreboard?.counts} />
-            </div>
+            <>
+              <div className="mt-3 grid grid-cols-[minmax(0,1fr)] items-start gap-6 min-[1000px]:grid-cols-2">
+                <TeamPrep side="home" team={gfx.home} gfx={gfx} />
+                <TeamPrep side="away" team={gfx.away} gfx={gfx} />
+              </div>
+            </>
           ) : (
             <span className="text-sm leading-relaxed font-light text-muted-foreground">
               Sobald eine Spiel-Konfiguration geladen ist, stehen hier Tor, Strafe, Name und Best Player für die Spielerinnen beider Teams, dazu Aufstellung, Starting 6 und Coach.

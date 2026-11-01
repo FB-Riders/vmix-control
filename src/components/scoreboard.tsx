@@ -28,7 +28,7 @@ export function ScoreboardTeam({ side, name, scoreboard: sb, add }: { side: GfxS
   return (
     <div className="flex flex-col gap-2 rounded-md bg-card p-3">
       <span className="truncate text-sm font-semibold">Strafen {name}</span>
-      {/* Penalties are started with the penalty buttons below; here they only run and can be taken off. */}
+      {/* They run here and can be taken off; the buttons below put one on the clock without a graphic. */}
       <div className="grid grid-cols-2 gap-1.5">
         {penalties.map((seconds, i) => (
           <div key={i} className={cn('flex h-9 items-center justify-between rounded-md border-2 pr-0.5 pl-2', seconds > 0 ? 'border-foreground' : 'border-input')}>
@@ -41,7 +41,6 @@ export function ScoreboardTeam({ side, name, scoreboard: sb, add }: { side: GfxS
           </div>
         ))}
       </div>
-      {/* Only where there are no penalty buttons of a team column (no game config loaded). */}
       {add && (
         <div className="grid auto-cols-fr grid-flow-col gap-1.5">
           {add.map((label) => (
@@ -106,6 +105,25 @@ export function BodetStatus({ scoreboard: sb, teams }: { scoreboard: ManualScore
   );
 }
 
+/** Einblender screen: a line that leads to the Matchuhr screen, only while the clock needs a look. */
+export function ClockNotice({ scoreboard: sb }: { scoreboard: ManualScoreboardState }) {
+  const b = sb.bodet;
+  const lost = !sb.manual && !!b && (!!b.error || b.signal === 'stale');
+  const differs = !sb.manual && !!b && b.signal !== 'none' && (b.score.home !== sb.score.home || b.score.away !== sb.score.away);
+  const text = sb.manual ? 'läuft von Hand'
+    : lost ? 'keine Daten vom Scorepad'
+    : differs ? `Anzeigetafel zeigt ${b.score.home}:${b.score.away}, das Panel ${sb.score.home}:${sb.score.away}`
+    : b?.signal === 'none' ? 'noch keine Daten vom Scorepad'
+    : null;
+  if (!text) return null;
+  return (
+    <a href="#matchuhr" role="status" className={cn('flex items-center justify-between gap-3 rounded-md border-2 px-3 py-2 text-[13px]', lost || differs ? 'border-primary font-black text-primary' : 'border-input font-medium')}>
+      <span>Matchuhr: {text}</span>
+      <span className="shrink-0 text-xs font-black tracking-wide">ÖFFNEN →</span>
+    </a>
+  );
+}
+
 /** The score is counted in the panel, whoever gives the time: a goal graphic counts, here it is corrected. */
 export function ScoreCount({ scoreboard: sb, teams }: { scoreboard: ManualScoreboardState; teams: { home: string; away: string } }) {
   const [resetting, setResetting] = useState(false);
@@ -140,8 +158,7 @@ export function ScoreCount({ scoreboard: sb, teams }: { scoreboard: ManualScoreb
 }
 
 /**
- * Clock by hand: game time, period and penalties of both teams, reset. The score has its own block (ScoreCount). `add` puts penalty buttons under the
- * teams, for when there are no team columns with penalty buttons (no game config loaded).
+ * Clock by hand: game time, period and penalties of both teams, reset. The score has its own block (ScoreCount). `add` puts penalty buttons under the teams.
  */
 export function ScoreboardPanel({ scoreboard: sb, teams, add }: { scoreboard: ManualScoreboardState; teams: { home: string; away: string }; add?: string[] }) {
   const { seconds } = useClock(sb);

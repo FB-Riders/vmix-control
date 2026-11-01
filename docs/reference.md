@@ -39,10 +39,16 @@ dropped frames or the Hub's status, so those are not shown.
 
 ## On-screen graphics (Einblender)
 
-The EINBLENDER screen replaces TCunihockey. The match clock comes from the hall's Bodet scoreboard, or is run by hand.
-It is grouped by vMix overlay channel: MATCHUHR (with the penalty shoot-out display, which takes its place),
-EINBLENDER, SPONSOREN and LIGA-LOGOS. Each group's heading says what is on its channel right now and has the
-button to put it on or take it off.
+The EINBLENDER screen replaces TCunihockey. It is grouped by vMix overlay channel: EINBLENDER, SPONSOREN and
+LIGA-LOGOS. Each group's heading says what is on its channel right now and has the button to put it on or take it off.
+
+The match clock comes from the hall's Bodet scoreboard, or is run by hand. It has its own MATCHUHR screen (UHR on a
+phone), with the source switch, the score and the penalty shoot-out display, which takes the clock's place. The
+Einblender screen shows a line leading there only while the clock needs a look: it runs by hand, the Scorepad sends
+no data, or its score differs from the panel's.
+
+Player graphics go in three steps: the team, the player (number and name), then the event (goal, name, best player,
+penalty). Own goal and time-out only need the team. After a graphic went out the choice starts over at the team.
 
 Load the game's `game-config.txt` there (the TCunihockey format written by <https://www.unihockey.live/generator>;
 UTF-8, UTF-16 and ANSI files are read). The panel then fills the league's vMix titles and fades them in on one
@@ -86,14 +92,14 @@ Matchuhr group corrects it with `−1` / `+1` (keys `H` / `G`, with Shift one of
 game. A note appears when the Scorepad shows a different score.
 
 **Match clock by hand (VON HAND).** If the link fails, the switch
-on the Einblender screen hands the title to the operator: the clock carries on from the time, period and
+on the Matchuhr screen hands the title to the operator: the clock carries on from the time, period and
 penalties the scoreboard last gave, and from then on the panel writes game time (counts up, stops at `scoreboard.manual.periodMinutes`),
 period and two penalties per team (they run with the game time and vanish at 00:00). A goal leaves the clock running;
 set `stopOnGoal` to `true` to have a goal stop it. UHR ZURÜCKSETZEN puts time, period and penalties back to the
 start and leaves the score. Back on ANZEIGETAFEL the scoreboard's data is written again.
 Without a `scoreboard.bodet` block the panel writes nothing in that mode and another program has to fill the title.
 
-Keyboard on the desktop (listed at the bottom of the screen): `Esc` takes the graphic off, `N` brings on the next
+Keyboard on the desktop, on both the Einblender and the Matchuhr screen (listed at the bottom): `Esc` takes the graphic off, `N` brings on the next
 player of the starting six, `M` puts the match clock on or off. With the clock by hand: space starts and stops it,
 `←` `→` correct the time by 1 s (10 s with Shift), `H` / `G` count a goal for home / away (Shift takes one off),
 and `2` `4` `5` start a 2', 2'+2' or 5' penalty on the clock for the home team (Shift: away team).

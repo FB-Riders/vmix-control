@@ -45,7 +45,7 @@ function Side({ side, name, shootout }: { side: GfxSide; name: string; shootout:
   );
 }
 
-/** Einblender screen: the penalty shoot-out display that takes the match clock's place, and its attempts. */
+/** Matchuhr screen: the penalty shoot-out display that takes the match clock's place, and its attempts. */
 export function ShootoutPanel({ shootout, home, away }: { shootout: ShootoutState; home: string; away: string }) {
   return (
     <>
