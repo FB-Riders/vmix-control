@@ -50,7 +50,7 @@ no data, or its score differs from the panel's.
 Player graphics go in three steps: the team, the player (number and name), then the event (goal, name, best player,
 penalty). Own goal and time-out only need the team. After a graphic went out the choice starts over at the team.
 
-Load the game's `game-config.txt` there (the TCunihockey format written by <https://www.unihockey.live/generator>;
+Load the game's `game-config.txt` at the top of the VOR DEM SPIEL screen (the TCunihockey format written by <https://www.unihockey.live/generator>;
 UTF-8, UTF-16 and ANSI files are read). The panel then fills the league's vMix titles and fades them in on one
 overlay channel, one at a time:
 

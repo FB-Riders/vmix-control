@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { PanelState } from '@shared/state';
 import { Caption } from '@/components/caption';
+import { GameConfig } from '@/components/game-config';
 import { SponsorAuto } from '@/components/sponsor';
 import { Button } from '@/components/ui/button';
 import { useNow } from '@/hooks/use-now';
@@ -35,7 +36,8 @@ export function AblaufPage({ state }: { state: PanelState }) {
         </button>
       </header>
 
-      <main className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3">
+      <main className="flex min-h-0 flex-1 flex-col gap-3 overflow-x-hidden overflow-y-auto px-4 py-3">
+        {state.gfx && <GameConfig gfx={state.gfx} />}
         <section className="flex flex-col gap-2.5 rounded-md bg-primary p-3.5">
           {next ? (
             <>

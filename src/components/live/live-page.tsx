@@ -18,7 +18,7 @@ export function LivePage({ state, marking }: { state: PanelState; marking: Marki
     <>
       <StatusHeader state={state} />
       <OverlayStrip overlays={state.overlays} className="gap-x-3 px-4 py-2 text-[11px]" />
-      <main className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3">
+      <main className="flex min-h-0 flex-1 flex-col gap-3 overflow-x-hidden overflow-y-auto px-4 py-3">
         <section className="flex flex-col gap-1.5">
           <Caption className="font-black text-primary">LIVE · 1 Klick = sofort auf Sendung</Caption>
           <ProgramRow cams={state.cams} />

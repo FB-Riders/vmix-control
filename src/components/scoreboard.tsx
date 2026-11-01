@@ -203,7 +203,7 @@ export function ScoreboardPanel({ scoreboard: sb, teams, add }: { scoreboard: Ma
       <ScoreboardTeam side="away" name={teams.away} scoreboard={sb} add={add} />
 
       <div className="flex gap-2">
-        <Input value={time} onChange={(e) => setTime(e.target.value)} placeholder="Zeit setzen, z. B. 12:30" inputMode="numeric" className="h-9 border-2 text-sm tabular-nums" aria-label="Spielzeit als Minuten und Sekunden" />
+        <Input value={time} onChange={(e) => setTime(e.target.value)} placeholder="Zeit setzen, z. B. 12:30" inputMode="numeric" className="h-9 border-2 text-base tabular-nums min-[1000px]:text-sm" aria-label="Spielzeit als Minuten und Sekunden" />
         <Button
           variant="outline"
           className={cn('h-9 shrink-0 px-3 text-xs', soft)}

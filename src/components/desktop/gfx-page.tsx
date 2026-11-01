@@ -1,8 +1,8 @@
-import { useRef, useState } from 'react';
-import { toast } from 'sonner';
+import { useState } from 'react';
 import type { GfxRequest, GfxSide } from '@shared/actions';
 import type { GfxState, GfxTeam, PanelState } from '@shared/state';
 import { Caption } from '@/components/caption';
+import { useConfigFile } from '@/components/game-config';
 import { Button } from '@/components/ui/button';
 import { ClockNotice } from '@/components/scoreboard';
 import { SponsorPanel } from '@/components/sponsor';
@@ -17,14 +17,6 @@ const show = (req: GfxRequest) => act('gfx/show', req);
 const soft = 'border-2 border-secondary bg-secondary font-black';
 const picked = 'border-muted-foreground bg-muted-foreground text-background hover:bg-muted-foreground hover:text-background';
 
-/** Reads a config file whatever its encoding: TCunihockey accepts UTF-8, UTF-16 and ANSI. */
-async function readText(file: File): Promise<string> {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  if (bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder('utf-16le').decode(bytes);
-  if (bytes[0] === 0xfe && bytes[1] === 0xff) return new TextDecoder('utf-16be').decode(bytes);
-  try { return new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch { return new TextDecoder('windows-1252').decode(bytes); }
-}
-
 /** During the game, in reading order: which team, which player, what happened. Afterwards it starts over at the team. */
 function PlayerEvents({ home, away, gfx, manual, counts }: { home: GfxTeam; away: GfxTeam; gfx: GfxState; manual: boolean; counts: boolean }) {
   const [side, setSide] = useState<GfxSide | null>(null);
@@ -34,8 +26,8 @@ function PlayerEvents({ home, away, gfx, manual, counts }: { home: GfxTeam; away
   const action = 'h-11 px-0 text-[13px]';
 
   function pick(next: GfxSide) {
-    setSide(next);
-    if (next !== side) setNr(null);
+    setSide(next === side ? null : next); // the picked team again: back to the start
+    setNr(null);
   }
   /** A failed action keeps the choice, so it can simply be tried again. */
   async function fire(run: Promise<unknown>) {
@@ -154,19 +146,9 @@ function TeamPrep({ side, team, gfx }: { side: GfxSide; team: GfxTeam; gfx: GfxS
 /** On-screen graphics from the game config: opener, people, line-ups, starting six, goals, penalties, results. */
 export function GfxPage({ state, embedded }: { state: PanelState; embedded?: boolean }) {
   const { gfx } = state;
-  const fileInput = useRef<HTMLInputElement>(null);
+  const sponsorFile = useConfigFile();
   const [text, setText] = useState('');
   const now = useNow();
-
-  async function load(file: File | undefined) {
-    if (!file) return;
-    const res = await act('gfx/import', { text: await readText(file) });
-    if (res) {
-      const { game, sponsors } = res.result;
-      toast.success(`«${file.name}» geladen: ${[game && 'Spiel', sponsors > 0 && `${sponsors} Sponsoren`].filter(Boolean).join(' und ')}`);
-    }
-    if (fileInput.current) fileInput.current.value = '';
-  }
 
   if (!gfx) {
     return (
@@ -192,28 +174,10 @@ export function GfxPage({ state, embedded }: { state: PanelState; embedded?: boo
   );
 
   const { scoreboard, sponsor, overlays } = state;
-  const names = { home: gfx.home?.long ?? 'Heim', away: gfx.away?.long ?? 'Gast' };
-  const teams = !!gfx.home && !!gfx.away;
   const logoChannel = overlays.find((o) => o.role === 'Logos')?.channel;
   const clockPenalties = gfx.penalties.map(penaltyKey).filter(Boolean).join(' ');
   const left = 'min-[1000px]:col-start-1';
   const small = cn('h-9 shrink-0 px-2.5 text-[11px]', soft);
-  const config = (
-    <section className={cn('flex flex-col gap-3', left)}>
-      <Label title="SPIEL-KONFIGURATION" />
-      <div className="flex items-center gap-3 rounded-md bg-card p-3">
-        <div className="flex min-w-0 grow flex-col gap-0.5">
-          <span className="truncate text-sm font-semibold">{teams ? `${names.home} – ${names.away}` : 'Keine Spiel-Konfiguration geladen'}</span>
-          <span className="truncate text-xs font-light text-muted-foreground">
-            {game ? [game.date, game.time, game.location].filter(Boolean).join(' · ') : 'game-config.txt von unihockey.live/generator'}
-          </span>
-        </div>
-        <Button variant="outline" className={cn('h-11 shrink-0 px-3 text-xs', game ? cn(soft, 'bg-background') : picked)} onClick={() => fileInput.current?.click()}>
-          {game ? 'NEU LADEN' : 'KONFIG LADEN'}
-        </Button>
-      </div>
-    </section>
-  );
 
   return (
     <DesktopShell
@@ -238,10 +202,7 @@ export function GfxPage({ state, embedded }: { state: PanelState; embedded?: boo
     >
       {/* Wide: the Einblender (overlay 2) fill the right two thirds, the other overlays stack on the left. */}
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-x-6 gap-y-8 min-[1000px]:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] min-[1000px]:grid-rows-[auto_auto_auto_auto_1fr]">
-        <input ref={fileInput} type="file" accept=".txt,text/plain" className="hidden" onChange={(e) => load(e.target.files?.[0])} />
-
-        {/* Without a game there is little to show: loading it comes first. */}
-        {!game && config}
+        {sponsorFile.input}
 
         <Group channel={gfx.overlay} title="EINBLENDER" overlays={overlays} className="min-[1000px]:col-start-2 min-[1000px]:row-span-5 min-[1000px]:row-start-1">
           {live ? (
@@ -282,7 +243,7 @@ export function GfxPage({ state, embedded }: { state: PanelState; embedded?: boo
             </>
           ) : (
             <span className="text-sm leading-relaxed font-light text-muted-foreground">
-              Sobald eine Spiel-Konfiguration geladen ist, stehen hier Tor, Strafe, Name und Best Player für die Spielerinnen beider Teams, dazu Aufstellung, Starting 6 und Coach.
+              Sobald eine Spiel-Konfiguration geladen ist (im Tab <a href="#vor" className="font-semibold underline underline-offset-2">Vor dem Spiel</a>), stehen hier Tor, Strafe, Name und Best Player für die Spielerinnen beider Teams, dazu Aufstellung, Starting 6 und Coach.
             </span>
           )}
 
@@ -290,7 +251,7 @@ export function GfxPage({ state, embedded }: { state: PanelState; embedded?: boo
             <div className="flex flex-col gap-3">
               <Label title="FREIER TEXT" />
               <div className="flex gap-2">
-                <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="Text für den Einblender" className="h-11 border-2 text-sm" aria-label="Freier Text" />
+                <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="Text für den Einblender" className="h-11 border-2 text-base min-[1000px]:text-sm" aria-label="Freier Text" />
                 <Button variant="outline" className={cn('h-11 shrink-0 px-3 text-xs', soft)} disabled={!text.trim()} onClick={() => show({ kind: 'text', text })}>EINBLENDEN</Button>
               </div>
               {gfx.shortcuts.map((s) => (
@@ -316,7 +277,7 @@ export function GfxPage({ state, embedded }: { state: PanelState; embedded?: boo
             title="SPONSOREN"
             overlays={overlays}
             className={left}
-            action={<Button variant="outline" className={small} onClick={() => fileInput.current?.click()}>LISTE LADEN</Button>}
+            action={<Button variant="outline" className={small} onClick={sponsorFile.open}>LISTE LADEN</Button>}
           >
             <SponsorPanel sponsor={sponsor} />
           </Group>
@@ -337,8 +298,6 @@ export function GfxPage({ state, embedded }: { state: PanelState; embedded?: boo
             <span className="text-xs font-light text-muted-foreground">Müssen während der ganzen Übertragung im Bild sein: auch im Vorlauf, in den Pausen, bei Interviews und über Werbung. Nur für den Liga-Trailer nimmt sie das Panel weg und bringt sie danach zurück.</span>
           </Group>
         )}
-
-        {game && config}
       </div>
     </DesktopShell>
   );

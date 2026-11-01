@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { PanelState } from '@shared/state';
 import { ScheduleDialog } from '@/components/ablauf/schedule-dialog';
 import { Caption } from '@/components/caption';
+import { GameConfig } from '@/components/game-config';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { useNow } from '@/hooks/use-now';
@@ -33,7 +34,13 @@ export function VorPage({ state }: { state: PanelState }) {
       footer={<span>Alles abgehakt und Stream läuft: die Regie wechselt automatisch auf den Live-Screen.</span>}
     >
       <div className="flex flex-col gap-3">
-        <Label title="JETZT" hint={`Stream-Start in vMix spätestens ${hhmm(pre.streamBy)}`} />
+        {state.gfx && (
+          <>
+            <Label title="SPIEL-KONFIGURATION" />
+            <GameConfig gfx={state.gfx} />
+          </>
+        )}
+        <Label title="JETZT" className={state.gfx ? 'mt-3' : undefined} hint={`Stream-Start in vMix spätestens ${hhmm(pre.streamBy)}`} />
         <div className={cn('flex flex-col gap-1.5 rounded-md p-5', streaming ? 'bg-card' : 'bg-primary')}>
           <Caption>{streaming ? 'STREAM LÄUFT · ANSPIEL IN' : late ? 'STREAM STARTEN · ÜBERFÄLLIG SEIT' : 'STREAM STARTEN IN'}</Caption>
           <span className="text-[56px] leading-none font-black tabular-nums">

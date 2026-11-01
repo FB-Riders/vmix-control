@@ -585,7 +585,7 @@ export class Panel {
     [...cfg.replay.highlightClip.intro, ...cfg.replay.highlightClip.outro].forEach((i) => need(i, 'Highlight-Clip'));
     need(cfg.replay.highlightMusic, 'Highlight-Musik');
     const needGame = (calls: VmixCall[], what: string) => {
-      if (this.gfx && !this.gfx.loaded && calls.some((c) => 'gfx' in c && c.gfx !== 'hide')) w.push(`${what}: Spiel-Konfiguration fehlt (im Tab Einblender laden)`);
+      if (this.gfx && !this.gfx.loaded && calls.some((c) => 'gfx' in c && c.gfx !== 'hide')) w.push(`${what}: Spiel-Konfiguration fehlt (im Tab Vor dem Spiel laden)`);
     };
     for (const s of cfg.schedules) {
       for (const step of s.steps) if (step.action) needGame(step.action.calls, step.label);

@@ -71,6 +71,7 @@
   }
   body {
     @apply bg-background text-foreground select-none;
+    overflow-wrap: anywhere; /* a long name must not make the page wider than a phone */
     overscroll-behavior: none;
     touch-action: manipulation;
   }

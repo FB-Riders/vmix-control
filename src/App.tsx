@@ -95,13 +95,13 @@ export default function App() {
 
   const tab = hash === 'nach' ? 'nach' : hash === 'grafik' ? 'grafik' : hash === 'matchuhr' ? 'matchuhr' : hash === 'pause' ? 'pause' : hash === 'ablauf' || hash === 'vor' ? 'ablauf' : 'live';
   return (
-    <div className="mx-auto flex h-dvh max-w-[480px] flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+    <div className="mx-auto flex h-dvh max-w-[480px] flex-col overflow-x-hidden pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
       {state ? (
         tab === 'live' ? <LivePage state={state} marking={marking} />
-          : tab === 'grafik' ? <div className="min-h-0 flex-1 overflow-y-auto"><GfxPage state={state} embedded /></div>
-          : tab === 'matchuhr' ? <div className="min-h-0 flex-1 overflow-y-auto"><ClockPage state={state} embedded /></div>
-          : tab === 'pause' ? <div className="min-h-0 flex-1 overflow-y-auto"><BreakPage state={state} embedded /></div>
-          : tab === 'nach' ? <div className="min-h-0 flex-1 overflow-y-auto"><NachPage state={state} embedded /></div>
+          : tab === 'grafik' ? <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto"><GfxPage state={state} embedded /></div>
+          : tab === 'matchuhr' ? <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto"><ClockPage state={state} embedded /></div>
+          : tab === 'pause' ? <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto"><BreakPage state={state} embedded /></div>
+          : tab === 'nach' ? <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto"><NachPage state={state} embedded /></div>
           : <AblaufPage state={state} />
       ) : (
         <div className="flex flex-1 items-center justify-center text-sm font-light text-muted-foreground">Verbinde …</div>
