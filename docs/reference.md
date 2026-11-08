@@ -6,6 +6,8 @@ Details for operators and for people who adapt the panel. The short start is in 
 
 Under the header every screen has the row **IM BILD**: one entry per vMix overlay channel (match clock, Einblender, sponsor, logos), lit while something is on it and saying what, e.g. the goal graphic's player or the sponsor's name. It is read from vMix, so it is also right when something was switched in vMix itself. A channel the panel took off for a replay, the highlights or the break says that it comes back by itself.
 
+On a phone the row stays in reach: once it is scrolled away, a bar pinned to the top shows what is on air (or "nichts eingeblendet"), with AUSBLENDEN for the Einblender. On the phone's Einblender screen the AUSBLENDEN button sits in the EINBLENDER heading instead of the large field above the buttons. The blocks at the top keep their height, so the page does not jump when something goes on or off.
+
 ## Views
 
 - **Phone** (narrow screens): LIVE and VOR SPIEL · PAUSE tabs. Alerts from the watchdogs show above the tab bar.

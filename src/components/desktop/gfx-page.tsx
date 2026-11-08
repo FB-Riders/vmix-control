@@ -48,7 +48,10 @@ function PlayerEvents({ home, away, gfx, manual, counts }: { home: GfxTeam; away
         ))}
       </div>
 
-      <Label title="2 · SPIELERIN" className="mt-1" hint={player ? `${player.nr} · ${player.name}${player.top ? ' · Topskorer' : ''}` : undefined} />
+      {/* One line only: picking a player must not push the grid below down. */}
+      <Label title="2 · SPIELERIN" className="mt-1 flex-nowrap">
+        {player && <span className="min-w-0 truncate text-xs font-light text-muted-foreground tabular-nums">{player.nr} · {player.name}{player.top ? ' · Topskorer' : ''}</span>}
+      </Label>
       {team ? (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(132px,1fr))] gap-1.5">
           {team.players.map((p) => (
@@ -204,16 +207,29 @@ export function GfxPage({ state, embedded }: { state: PanelState; embedded?: boo
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-x-6 gap-y-8 min-[1000px]:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] min-[1000px]:grid-rows-[auto_auto_auto_auto_1fr]">
         {sponsorFile.input}
 
-        <Group channel={gfx.overlay} title="EINBLENDER" overlays={overlays} className="min-[1000px]:col-start-2 min-[1000px]:row-span-5 min-[1000px]:row-start-1">
-          {live ? (
-            <Button className="h-20 flex-col gap-0.5 whitespace-normal" onClick={() => act('gfx/hide')}>
-              <span className="text-xl font-black tracking-wide">AUSBLENDEN</span>
-              <span className="text-[13px] font-medium tabular-nums">{live.summary}{live.until ? ` · geht in ${Math.max(0, Math.ceil((live.until - now) / 1000))} s von selbst weg` : ' · bleibt, bis ausgeblendet'}</span>
+        <Group
+          channel={gfx.overlay}
+          title="EINBLENDER"
+          overlays={overlays}
+          className="min-[1000px]:col-start-2 min-[1000px]:row-span-5 min-[1000px]:row-start-1"
+          // Phone: what is on shows in the heading and the floating IM BILD bar, so only the button to take it off.
+          action={embedded && live ? (
+            <Button className="h-9 shrink-0 px-3 text-xs font-black tracking-wide tabular-nums" onClick={() => act('gfx/hide')}>
+              AUSBLENDEN{live.until ? ` · ${Math.max(0, Math.ceil((live.until - now) / 1000))} s` : ''}
+            </Button>
+          ) : undefined}
+        >
+          {embedded ? null : live ? (
+            // Fixed lines that cut long text, so the countdown or a long name never changes the height.
+            <Button className="h-20 w-full min-w-0 flex-col gap-0 px-4" onClick={() => act('gfx/hide')}>
+              <span className="text-xl leading-tight font-black tracking-wide">AUSBLENDEN</span>
+              <span className="max-w-full truncate text-[13px] font-semibold">{live.summary}</span>
+              <span className="max-w-full truncate text-[13px] font-medium tabular-nums">{live.until ? `geht in ${Math.max(0, Math.ceil((live.until - now) / 1000))} s von selbst weg` : 'bleibt, bis ausgeblendet'}</span>
             </Button>
           ) : (
-            <div className="flex h-20 flex-col justify-center gap-0.5 rounded-md bg-card px-4">
+            <div className="flex h-20 min-w-0 flex-col justify-center gap-0.5 rounded-md bg-card px-4">
               <span className="text-xl font-black">Nichts eingeblendet</span>
-              <span className="text-[13px] font-light text-muted-foreground">Ein Knopf blendet direkt ein. Hier wieder ausblenden.</span>
+              <span className="truncate text-[13px] font-light text-muted-foreground">Ein Knopf blendet direkt ein. Hier wieder ausblenden.</span>
             </div>
           )}
 

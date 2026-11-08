@@ -3,8 +3,10 @@ import { Caption } from '@/components/caption';
 import { OverlayStrip } from '@/components/overlays';
 import { Indicator } from '@/components/live/status-header';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { setDebugOpen, useDebugOpen } from '@/hooks/use-debug';
 import { useNow } from '@/hooks/use-now';
+import { act } from '@/lib/api';
 import { hhmmss } from '@/lib/time';
 import { cn } from '@/lib/utils';
 
@@ -60,8 +62,10 @@ export function Group({ channel, title, overlays, action, className, children }:
   const status = o?.on ? (o.text && o.text !== o.role ? o.text : 'eingeblendet') : o?.paused ? 'kommt von selbst zurück' : 'aus';
   return (
     <section aria-label={`Overlay ${channel}: ${title}`} className={cn('flex min-w-0 flex-col gap-3', className)}>
+      {/* The title side takes the room that is left (basis 0), so a long status is cut instead of pushing the action
+          onto a second line. */}
       <div className="flex min-h-11 flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-b-2 border-muted-foreground pb-2">
-        <div className="flex min-w-0 flex-col">
+        <div className="flex min-w-0 grow basis-0 flex-col">
           <span className="text-[15px] font-black tracking-widest">{title}</span>
           <span className={cn('truncate text-xs tabular-nums', o?.on ? 'font-semibold' : 'font-light text-muted-foreground')}>
             <span className={o?.on ? 'text-primary' : 'text-input'}>●</span> Overlay {channel} · {status}
@@ -92,28 +96,44 @@ export function DesktopShell({ state, view, header, footer, children, embedded }
   return (
     <div className={cn('flex flex-col', !embedded && 'min-h-full')}>
       {!embedded && <PhaseTabs view={view} streaming={state.streaming} clock={!!state.scoreboard} />}
-      <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b px-6 py-3.5">
-        <div className="flex flex-wrap items-center gap-4">
+      {/* On the phone the blocks above the page keep their height (no wrapping as clock, loudness or warnings
+          change), otherwise everything below jumps. Text that does not fit is cut, the warnings scroll sideways. */}
+      <header className={cn('flex items-center justify-between gap-x-6 gap-y-3 border-b px-6 py-3.5', embedded ? 'flex-col items-stretch' : 'flex-wrap')}>
+        <div className={cn('flex items-center gap-4', embedded ? 'min-w-0 [&>*:not(:first-child)]:truncate' : 'flex-wrap')}>
           <Badge variant={state.streaming ? 'default' : 'secondary'} className="h-auto rounded-sm px-2.5 py-[5px] text-sm font-black tracking-widest">
             {state.streaming ? 'ON AIR' : 'OFF AIR'}
           </Badge>
           {score?.teams && <span className="text-[15px] font-light text-muted-foreground">{score.teams}</span>}
           {header}
         </div>
-        <div className="flex flex-wrap items-center gap-5 text-[13px] font-medium text-muted-foreground">
+        <div className={cn('flex items-center gap-5 text-[13px] font-medium whitespace-nowrap text-muted-foreground', embedded ? 'min-w-0 overflow-hidden' : 'flex-wrap')}>
           <Indicator label="STREAM" on={state.streaming} />
           <Indicator label="REC" on={state.recording} />
           <Indicator label="REPLAY" on={state.replayRecording} />
-          {health.loudness !== null && <span className="tabular-nums">TON ≈ {health.loudness.toFixed(1)} LUFS</span>}
-          <span className="text-[15px] font-semibold text-foreground tabular-nums">{hhmmss(now)}</span>
+          {health.loudness !== null && <span className="min-w-0 truncate tabular-nums">TON ≈ {health.loudness.toFixed(1)} LUFS</span>}
+          <span className="ml-auto shrink-0 text-[15px] font-semibold text-foreground tabular-nums">{hhmmss(now)}</span>
         </div>
       </header>
 
-      <OverlayStrip overlays={state.overlays} className="px-6 py-2.5" />
+      <OverlayStrip
+        overlays={state.overlays}
+        className="px-6 py-2.5"
+        floating={embedded}
+        // The Einblender can be taken off from the floating bar, wherever the page is scrolled to.
+        actions={state.gfx?.live ? {
+          [state.gfx.overlay]: (
+            <Button className="h-7 shrink-0 px-2.5 text-[11px] font-black tracking-wide" onClick={() => act('gfx/hide')}>AUSBLENDEN</Button>
+          ),
+        } : undefined}
+      />
 
       <div
         role="status"
-        className={cn('flex flex-wrap items-center gap-x-5 gap-y-2 px-6 py-2.5 text-xs font-light', health.alerts.length ? 'bg-primary text-foreground' : 'bg-card text-muted-foreground')}
+        className={cn(
+          'flex items-center gap-x-5 gap-y-2 px-6 py-2.5 text-xs font-light',
+          embedded ? 'h-10 shrink-0 overflow-x-auto py-0 whitespace-nowrap [scrollbar-width:none]' : 'flex-wrap',
+          health.alerts.length ? 'bg-primary text-foreground' : 'bg-card text-muted-foreground',
+        )}
       >
         <span className="font-black tracking-widest text-foreground">{state.streaming ? 'WÄCHTER AKTIV' : 'WÄCHTER · startet mit dem Stream'}</span>
         {health.alerts.length
